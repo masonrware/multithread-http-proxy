@@ -150,6 +150,14 @@ void serve_forever(int *server_fd) {
         exit(errno);
     }
 
+    /*
+    Create an array of pthread_t type with the length equal to numlisteners
+    For each thread in the array, instantiate the thread with Pthread_create
+        - What function do we pass each thread?
+            - listen() system call?
+        - Should we join these threads to the main thread, or have them function independently?
+    */
+
     printf("Listening on port %d...\n", proxy_port);
 
     struct sockaddr_in client_address;
