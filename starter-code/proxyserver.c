@@ -105,6 +105,22 @@ void serve_request(int client_fd) {
 }
 
 
+/*
+    Create an array of pthread_t type with the length equal to numlisteners
+    For each thread in the array, instantiate the thread with Pthread_create
+        - What function do we pass each thread?
+            - listen() system call?
+        - Should we join these threads to the main thread, or have them function independently?
+
+    split to listen forever, serve forever
+    each listener bound to a different port
+
+    worker threads and listener threads
+        - worker calls serve forever
+        - listener calls listen forever
+*/
+
+
 int server_fd;
 /*
  * opens a TCP stream socket on all interfaces with port number PORTNO. Saves
@@ -149,14 +165,6 @@ void serve_forever(int *server_fd) {
         perror("Failed to listen on socket");
         exit(errno);
     }
-
-    /*
-    Create an array of pthread_t type with the length equal to numlisteners
-    For each thread in the array, instantiate the thread with Pthread_create
-        - What function do we pass each thread?
-            - listen() system call?
-        - Should we join these threads to the main thread, or have them function independently?
-    */
 
     printf("Listening on port %d...\n", proxy_port);
 
