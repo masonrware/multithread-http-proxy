@@ -174,7 +174,7 @@ void serve_forever(int *server_fd) {
     while (1) {
         client_fd = accept(*server_fd,
                            (struct sockaddr *)&client_address,
-                           (socklen_t *)&client_address_length);
+                           (socklen_t *)&client_address_length); // listener threads
         if (client_fd < 0) {
             perror("Error accepting socket");
             continue;
@@ -184,7 +184,7 @@ void serve_forever(int *server_fd) {
                inet_ntoa(client_address.sin_addr),
                client_address.sin_port);
 
-        serve_request(client_fd);
+        serve_request(client_fd); // worker threads
 
         // close the connection to the client
         shutdown(client_fd, SHUT_WR);
@@ -193,6 +193,11 @@ void serve_forever(int *server_fd) {
 
     shutdown(*server_fd, SHUT_RDWR);
     close(*server_fd);
+}
+
+//TODO
+void listen_forever(int *server_fd){
+    return;
 }
 
 /*
@@ -269,6 +274,20 @@ int main(int argc, char **argv) {
         }
     }
     print_settings();
+
+    // create listener threads for num_listener
+    // attach a listen_forever function
+    pthread_t listeners[num_listener];
+    for (int i = 0; i < num_listener; i++){
+        pthread_create(&listeners[i], NULL, listen_forever, &server_fd);
+    }
+
+    // create worker threads for num_workers
+    // attach serve_forever function
+    pthread_t workers[num_workers];
+    for (int i = 0; i < num_workers; i++){
+        pthread_create(&workers[i], NULL, serve_forever, &server_fd);
+    }
 
     serve_forever(&server_fd);
 
