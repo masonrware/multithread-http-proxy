@@ -120,6 +120,12 @@ void serve_request(int client_fd) {
         - listener calls listen_forever
 */
 
+// pass args into a thread
+struct ThreadArgs {
+    int* server_fd;
+    int port;
+};
+
 
 int server_fd;
 /*
@@ -127,6 +133,8 @@ int server_fd;
  * the fd number of the server socket in *socket_number. For each accepted
  * connection, calls request_handler with the accepted fd number.
  */
+
+// take in void* args, convert to struct pointer for ThreadArgs
 void serve_forever(int *server_fd) {
 
     // create a socket to listen
@@ -196,8 +204,11 @@ void serve_forever(int *server_fd) {
     close(*server_fd);
 }
 
-//TODO
-void listen_forever(int *server_fd){
+// TODO
+// take in void* args, convert to struct pointer for ThreadArgs
+void listen_forever(void *thread_args){
+    struct ThreadArgs *args = (struct ThreadArgs *) thread_args;
+
     return;
 }
 
@@ -278,18 +289,28 @@ int main(int argc, char **argv) {
     print_settings();
 
     // create listener threads for num_listener
-    // attach a listen_forever function
     pthread_t listeners[num_listener];
     for (int i = 0; i < num_listener; i++){
-        pthread_create(&listeners[i], NULL, listen_forever, &server_fd);
+        // server_fd for each thread?
+        // where do we store this?
+        // used in signal callback handler to close server_fd
+        struct ThreadArgs args;
+        args.server_fd = &server_fd;
+        args.port = listener_ports[i];
+        if (pthread_create(&listeners[i], NULL, listen_forever, (void*) &args) != 0){
+            fprintf(stderr, "Failed to create thread\n");
+            return 1;
+        }
         // should we join these?
     }
 
     // create worker threads for num_workers
-    // attach a serve_forever function
     pthread_t workers[num_workers];
     for (int i = 0; i < num_workers; i++){
-        pthread_create(&workers[i], NULL, serve_forever, &server_fd);
+        if (pthread_create(&workers[i], NULL, serve_forever, &server_fd) != 0){
+            fprintf(stderr, "Failed to create thread\n");
+            return 1;
+        }
         // should we join these?
     }
 
