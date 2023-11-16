@@ -112,12 +112,12 @@ void serve_request(int client_fd) {
             - listen() system call?
         - Should we join these threads to the main thread, or have them function independently?
 
-    split to listen forever, serve forever
+    split serve_forever into listen_forever, serve_forever
     each listener bound to a different port
 
     worker threads and listener threads
-        - worker calls serve forever
-        - listener calls listen forever
+        - worker calls serve_forever
+        - listener calls listen_forever
 */
 
 
@@ -144,7 +144,8 @@ void serve_forever(int *server_fd) {
         exit(errno);
     }
 
-
+    // pass in port with server_fd, set proxy_port to port that is passed in
+    // create argument struct to pass to thread so we can access port and server_fd
     int proxy_port = listener_ports[0];
     // create the full address of this proxyserver
     struct sockaddr_in proxy_address;
@@ -256,6 +257,7 @@ int main(int argc, char **argv) {
         if (strcmp("-l", argv[i]) == 0) {
             num_listener = atoi(argv[++i]);
             free(listener_ports);
+            // give each listener a unique port starting from specified port
             listener_ports = (int *)malloc(num_listener * sizeof(int));
             for (int j = 0; j < num_listener; j++) {
                 listener_ports[j] = atoi(argv[++i]);
@@ -280,16 +282,18 @@ int main(int argc, char **argv) {
     pthread_t listeners[num_listener];
     for (int i = 0; i < num_listener; i++){
         pthread_create(&listeners[i], NULL, listen_forever, &server_fd);
+        // should we join these?
     }
 
     // create worker threads for num_workers
-    // attach serve_forever function
+    // attach a serve_forever function
     pthread_t workers[num_workers];
     for (int i = 0; i < num_workers; i++){
         pthread_create(&workers[i], NULL, serve_forever, &server_fd);
+        // should we join these?
     }
 
-    serve_forever(&server_fd);
+    // serve_forever(&server_fd);
 
     return EXIT_SUCCESS;
 }
