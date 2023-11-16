@@ -126,8 +126,12 @@ struct ThreadArgs {
     int port;
 };
 
+// I think we can remove this fd since each
+// int server_fd;
 
-int server_fd;
+// array to access thread arguments globally, corresponds to num_listener
+struct ThreadArgs* argls;
+
 /*
  * opens a TCP stream socket on all interfaces with port number PORTNO. Saves
  * the fd number of the server socket in *socket_number. For each accepted
@@ -243,7 +247,10 @@ void print_settings() {
 void signal_callback_handler(int signum) {
     printf("Caught signal %d: %s\n", signum, strsignal(signum));
     for (int i = 0; i < num_listener; i++) {
-        if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
+        // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
+
+        // modified to close each file descriptor
+        if (close(*argls[i].server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
     }
     free(listener_ports);
     exit(0);
@@ -288,16 +295,18 @@ int main(int argc, char **argv) {
     }
     print_settings();
 
+    // make space for list of ThreadArgs
+    argls = (struct ThreadArgs*) malloc(sizeof(struct ThreadArgs) * num_listener);
+
     // create listener threads for num_listener
     pthread_t listeners[num_listener];
     for (int i = 0; i < num_listener; i++){
-        // server_fd for each thread?
-        // where do we store this?
-        // used in signal callback handler to close server_fd
+
         struct ThreadArgs args;
-        args.server_fd = &server_fd;
         args.port = listener_ports[i];
-        if (pthread_create(&listeners[i], NULL, listen_forever, (void*) &args) != 0){
+        argls[i] = args; // place struct in array
+
+        if (pthread_create(&listeners[i], NULL, listen_forever, (void*) &argls[i]) != 0){
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
@@ -307,7 +316,10 @@ int main(int argc, char **argv) {
     // create worker threads for num_workers
     pthread_t workers[num_workers];
     for (int i = 0; i < num_workers; i++){
-        if (pthread_create(&workers[i], NULL, serve_forever, &server_fd) != 0){
+        struct ThreadArgs args;
+        // workers don't need a port (I think)
+        // pass in a struct so each worker can create its own socket
+        if (pthread_create(&workers[i], NULL, serve_forever, (void*) &args) != 0){
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
