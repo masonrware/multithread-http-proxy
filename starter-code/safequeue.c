@@ -80,16 +80,16 @@ struct HeapNode extractMax(struct PriorityQueue *pq) {
 }
 
 // Example usage
-int main() {
-    struct PriorityQueue pq;
-    pq.size = 0;
+// int main() {
+//     struct PriorityQueue pq;
+//     pq.size = 0;
 
-    insert(&pq, 3, 2);
-    insert(&pq, 5, 1);
-    insert(&pq, 8, 3);
+//     insert(&pq, 3, 2);
+//     insert(&pq, 5, 1);
+//     insert(&pq, 8, 3);
 
-    struct HeapNode maxNode = extractMax(&pq);
-    printf("Extracted element: %d with priority %d\n", maxNode.data, maxNode.priority);
+//     struct HeapNode maxNode = extractMax(&pq);
+//     printf("Extracted element: %d with priority %d\n", maxNode.data, maxNode.priority);
 
-    return 0;
+//     return 0;
 }

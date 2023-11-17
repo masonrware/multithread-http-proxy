@@ -323,6 +323,7 @@ int main(int argc, char **argv) {
             num_workers = atoi(argv[++i]);
         } else if (strcmp("-q", argv[i]) == 0) {
             max_queue_size = atoi(argv[++i]);
+            pq.size = 0;
             pq.max_size = max_queue_size;
         } else if (strcmp("-i", argv[i]) == 0) {
             fileserver_ipaddr = argv[++i];
