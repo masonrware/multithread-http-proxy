@@ -34,7 +34,7 @@ int num_workers;
 char *fileserver_ipaddr;
 int fileserver_port;
 int max_queue_size;
-// add pq declaration here
+struct PriorityQueue pq;
 
 void send_error_response(int client_fd, status_code_t err_code, char *err_msg) {
     http_start_response(client_fd, err_code);
@@ -323,7 +323,7 @@ int main(int argc, char **argv) {
             num_workers = atoi(argv[++i]);
         } else if (strcmp("-q", argv[i]) == 0) {
             max_queue_size = atoi(argv[++i]);
-            // set pq's max_size to max_queue_size
+            pq.max_size = max_queue_size;
         } else if (strcmp("-i", argv[i]) == 0) {
             fileserver_ipaddr = argv[++i];
         } else if (strcmp("-p", argv[i]) == 0) {

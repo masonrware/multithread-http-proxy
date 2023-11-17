@@ -12,9 +12,9 @@ struct HeapNode {
 
 // Structure to represent the priority queue
 struct PriorityQueue {
-    int max_size;
     struct HeapNode heap[MAX_SIZE];
     int size;
+    int max_size;
 };
 
 // Function to swap two nodes in the heap

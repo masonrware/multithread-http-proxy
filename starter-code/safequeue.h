@@ -15,6 +15,7 @@ struct HeapNode {
 struct PriorityQueue {
     struct HeapNode heap[MAX_SIZE];
     int size;
+    int max_size;
 };
 
 // Function prototypes
