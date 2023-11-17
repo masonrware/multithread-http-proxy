@@ -132,12 +132,9 @@ struct WorkerThreadArgs {
     int port;
 };
 
-// I think we can remove this fd since each
-// int server_fd;
-
 // array to access thread arguments globally, corresponds to num_listener
 struct ListenerThreadArgs* listener_args_array;
-// array to access thread arguments globally, corresponds to num_worker
+// array to access thread arguments globally, corresponds to num_workers
 struct WorkerThreadArgs* worker_args_array;
 
 
@@ -350,7 +347,8 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
-        // should we join these?
+
+        pthread_join(listeners[i], NULL);
     }
 
     // create worker threads for num_workers
@@ -365,7 +363,8 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
-        // TODO join these?
+
+        pthread_join(workers[i], NULL);
     }
 
     return EXIT_SUCCESS;
