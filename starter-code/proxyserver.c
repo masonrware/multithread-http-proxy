@@ -223,6 +223,25 @@ void listen_forever(void* listener_args){
 void serve_forever(void* worker_args) {
     struct WorkerThreadArgs *args = (struct WorkerThreadArgs *) worker_args;
 
+    // create a socket to listen
+    args->server_fd = socket(PF_INET, SOCK_STREAM, 0);
+    if (args->server_fd == -1) {
+        perror("Failed to create a new socket");
+        exit(errno);
+    }
+
+    // manipulate options for the socket
+    int socket_option = 1;
+    if (setsockopt(args->server_fd, SOL_SOCKET, SO_REUSEADDR, &socket_option,
+                   sizeof(socket_option)) == -1) {
+        perror("Failed to set socket options");
+        exit(errno);
+    }
+
+    // TODO bind socket above to target ip address and port
+    // char *fileserver_ipaddr;  int fileserver_port;
+
+
     // TODO consume priority queue contents with locking etc...
     serve_request(args->server_fd); // worker threads
 }
@@ -262,14 +281,15 @@ void signal_callback_handler(int signum) {
         // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
 
         // modified to close each server file descriptor
-        if (close(*listener_args_array[i].server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
+        if (close(*listener_args_array[i].proxy_fd) < 0) perror("Failed to close proxy_fd (ignoring)\n");
+        if (close(*listener_args_array[i].client_fd) < 0) perror("Failed to close client_fd (ignoring)\n");
     }
     // close worker client fds
     for (int i = 0; i < num_workers; i++) {
         // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
 
         // modified to close each client file descriptor
-        if (close(*worker_args_array[i].client_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
+        if (close(*worker_args_array[i].server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
     }
     free(listener_ports);
     exit(0);
@@ -337,8 +357,6 @@ int main(int argc, char **argv) {
     pthread_t workers[num_workers];
     for (int i = 0; i < num_workers; i++){
         struct WorkerThreadArgs args;
-        // workers don't need a port (I think)
-        // MW: I think workers DO need a port -- the port of the target. Of course, this is unchanging, but it can't hurt to save it for consistency?
         args.port = fileserver_port;
         worker_args_array[i] = args;
 
@@ -347,10 +365,8 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
-        // should we join these?
+        // TODO join these?
     }
-
-    // serve_forever(&server_fd);
 
     return EXIT_SUCCESS;
 }
