@@ -158,9 +158,9 @@ void listen_forever(void* listener_args){
         exit(errno);
     }
 
-    // pass in port with server_fd, set proxy_port to port that is passed in
-    // create argument struct to pass to thread so we can access port and server_fd
-    int proxy_port = listener_ports[0];
+    // assign socket thread-specific port
+    int proxy_port = args->port;
+
     // create the full address of this proxyserver
     struct sockaddr_in proxy_address;
     memset(&proxy_address, 0, sizeof(proxy_address));
@@ -332,6 +332,7 @@ int main(int argc, char **argv) {
     print_settings();
 
     // make space for lists of Thread Arguments
+    // REMEMBER TO FREE THESE EVENTUALLY
     listener_args_array = (struct ListenerThreadArgs*) malloc(sizeof(struct ListenerThreadArgs) * num_listener);
     worker_args_array = (struct WorkerThreadArgs*) malloc(sizeof(struct WorkerThreadArgs) * num_workers);
 
