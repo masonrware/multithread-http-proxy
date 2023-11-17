@@ -12,6 +12,7 @@ struct HeapNode {
 
 // Structure to represent the priority queue
 struct PriorityQueue {
+    int max_size;
     struct HeapNode heap[MAX_SIZE];
     int size;
 };
@@ -43,7 +44,7 @@ void maxHeapify(struct PriorityQueue *pq, int i) {
 
 // Function to insert a new element with a given priority into the priority queue
 void insert(struct PriorityQueue *pq, int data, int priority) {
-    if (pq->size == MAX_SIZE) {
+    if (pq->size == pq->max_size) {
         printf("Priority Queue is full. Cannot insert.\n");
         return;
     }
