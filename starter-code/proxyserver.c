@@ -122,6 +122,7 @@ void serve_request(int client_fd) {
 
 // pass args into a thread
 struct ListenerThreadArgs {
+    int* proxy_fd;
     int* client_fd;
     int port;
 };
@@ -145,29 +146,16 @@ struct WorkerThreadArgs* worker_args_array;
 void listen_forever(void* listener_args){
     struct ListenerThreadArgs *args = (struct ListenerThreadArgs *) listener_args;
 
-    return;
-}
-
-/*
- * opens a TCP stream socket on all interfaces with port number PORTNO. Saves
- * the fd number of the server socket in *socket_number. For each accepted
- * connection, calls request_handler with the accepted fd number.
- */
-
-// take in void* args, convert to struct pointer for ThreadArgs
-void serve_forever(void* worker_args) {
-    struct WorkerThreadArgs *args = (struct WorkerThreadArgs *) worker_args;
-
     // create a socket to listen
-    *args->server_fd = socket(PF_INET, SOCK_STREAM, 0);
-    if (*args->server_fd == -1) {
+    args->proxy_fd = socket(PF_INET, SOCK_STREAM, 0);
+    if (args->proxy_fd == -1) {
         perror("Failed to create a new socket");
         exit(errno);
     }
 
     // manipulate options for the socket
     int socket_option = 1;
-    if (setsockopt(*args->server_fd, SOL_SOCKET, SO_REUSEADDR, &socket_option,
+    if (setsockopt(args->proxy_fd, SOL_SOCKET, SO_REUSEADDR, &socket_option,
                    sizeof(socket_option)) == -1) {
         perror("Failed to set socket options");
         exit(errno);
@@ -184,18 +172,14 @@ void serve_forever(void* worker_args) {
     proxy_address.sin_port = htons(proxy_port); // listening port
 
     // bind the socket to the address and port number specified in
-    if (bind(*args->server_fd, (struct sockaddr *)&proxy_address,
+    if (bind(*args->proxy_fd, (struct sockaddr *)&proxy_address,
              sizeof(proxy_address)) == -1) {
         perror("Failed to bind on socket");
         exit(errno);
     }
     
-    /*
-    * BELOW IS LISTENING CODE
-    */
-
     // starts waiting for the client to request a connection
-    if (listen(*args->server_fd, 1024) == -1) {
+    if (listen(*args->proxy_fd, 1024) == -1) {
         perror("Failed to listen on socket");
         exit(errno);
     }
@@ -204,12 +188,11 @@ void serve_forever(void* worker_args) {
 
     struct sockaddr_in client_address;
     size_t client_address_length = sizeof(client_address);
-    int client_fd;
     while (1) {
-        client_fd = accept(*args->server_fd,
+        args->client_fd = accept(*args->proxy_fd,
                            (struct sockaddr *)&client_address,
                            (socklen_t *)&client_address_length); // listener threads
-        if (client_fd < 0) {
+        if (args->client_fd < 0) {
             perror("Error accepting socket");
             continue;
         }
@@ -217,16 +200,31 @@ void serve_forever(void* worker_args) {
         printf("Accepted connection from %s on port %d\n",
                inet_ntoa(client_address.sin_addr),
                client_address.sin_port);
-
-        serve_request(client_fd); // worker threads
+        
+        // TODO replace below with write to priority queue with locking etc...
+        serve_request(args->client_fd); // worker threads
 
         // close the connection to the client
-        shutdown(client_fd, SHUT_WR);
-        close(client_fd);
+        shutdown(args->client_fd, SHUT_WR);
+        close(args->client_fd);
     }
 
-    shutdown(*args->server_fd, SHUT_RDWR);
-    close(*args->server_fd);
+    shutdown(args->proxy_fd, SHUT_RDWR);
+    close(args->proxy_fd);
+}
+
+/*
+ * opens a TCP stream socket on all interfaces with port number PORTNO. Saves
+ * the fd number of the server socket in *socket_number. For each accepted
+ * connection, calls request_handler with the accepted fd number.
+ */
+
+// take in void* args, convert to struct pointer for ThreadArgs
+void serve_forever(void* worker_args) {
+    struct WorkerThreadArgs *args = (struct WorkerThreadArgs *) worker_args;
+
+    // TODO consume priority queue contents with locking etc...
+    serve_request(args->server_fd); // worker threads
 }
 
 /*
