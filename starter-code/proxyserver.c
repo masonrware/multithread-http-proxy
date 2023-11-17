@@ -121,7 +121,12 @@ void serve_request(int client_fd) {
 */
 
 // pass args into a thread
-struct ThreadArgs {
+struct ListenerThreadArgs {
+    int* client_fd;
+    int port;
+};
+
+struct WorkerThreadArgs {
     int* server_fd;
     int port;
 };
@@ -130,7 +135,18 @@ struct ThreadArgs {
 // int server_fd;
 
 // array to access thread arguments globally, corresponds to num_listener
-struct ThreadArgs* argls;
+struct ListenerThreadArgs* listener_args_array;
+// array to access thread arguments globally, corresponds to num_worker
+struct WorkerThreadArgs* worker_args_array;
+
+
+// TODO
+// take in void* args, convert to struct pointer for ThreadArgs
+void listen_forever(void* listener_args){
+    struct ListenerThreadArgs *args = (struct ListenerThreadArgs *) listener_args;
+
+    return;
+}
 
 /*
  * opens a TCP stream socket on all interfaces with port number PORTNO. Saves
@@ -139,18 +155,19 @@ struct ThreadArgs* argls;
  */
 
 // take in void* args, convert to struct pointer for ThreadArgs
-void serve_forever(int *server_fd) {
+void serve_forever(void* worker_args) {
+    struct WorkerThreadArgs *args = (struct WorkerThreadArgs *) worker_args;
 
     // create a socket to listen
-    *server_fd = socket(PF_INET, SOCK_STREAM, 0);
-    if (*server_fd == -1) {
+    *args->server_fd = socket(PF_INET, SOCK_STREAM, 0);
+    if (*args->server_fd == -1) {
         perror("Failed to create a new socket");
         exit(errno);
     }
 
     // manipulate options for the socket
     int socket_option = 1;
-    if (setsockopt(*server_fd, SOL_SOCKET, SO_REUSEADDR, &socket_option,
+    if (setsockopt(*args->server_fd, SOL_SOCKET, SO_REUSEADDR, &socket_option,
                    sizeof(socket_option)) == -1) {
         perror("Failed to set socket options");
         exit(errno);
@@ -167,14 +184,18 @@ void serve_forever(int *server_fd) {
     proxy_address.sin_port = htons(proxy_port); // listening port
 
     // bind the socket to the address and port number specified in
-    if (bind(*server_fd, (struct sockaddr *)&proxy_address,
+    if (bind(*args->server_fd, (struct sockaddr *)&proxy_address,
              sizeof(proxy_address)) == -1) {
         perror("Failed to bind on socket");
         exit(errno);
     }
+    
+    /*
+    * BELOW IS LISTENING CODE
+    */
 
     // starts waiting for the client to request a connection
-    if (listen(*server_fd, 1024) == -1) {
+    if (listen(*args->server_fd, 1024) == -1) {
         perror("Failed to listen on socket");
         exit(errno);
     }
@@ -185,7 +206,7 @@ void serve_forever(int *server_fd) {
     size_t client_address_length = sizeof(client_address);
     int client_fd;
     while (1) {
-        client_fd = accept(*server_fd,
+        client_fd = accept(*args->server_fd,
                            (struct sockaddr *)&client_address,
                            (socklen_t *)&client_address_length); // listener threads
         if (client_fd < 0) {
@@ -204,16 +225,8 @@ void serve_forever(int *server_fd) {
         close(client_fd);
     }
 
-    shutdown(*server_fd, SHUT_RDWR);
-    close(*server_fd);
-}
-
-// TODO
-// take in void* args, convert to struct pointer for ThreadArgs
-void listen_forever(void *thread_args){
-    struct ThreadArgs *args = (struct ThreadArgs *) thread_args;
-
-    return;
+    shutdown(*args->server_fd, SHUT_RDWR);
+    close(*args->server_fd);
 }
 
 /*
@@ -246,11 +259,19 @@ void print_settings() {
 
 void signal_callback_handler(int signum) {
     printf("Caught signal %d: %s\n", signum, strsignal(signum));
+    // close listener server fds
     for (int i = 0; i < num_listener; i++) {
         // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
 
-        // modified to close each file descriptor
-        if (close(*argls[i].server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
+        // modified to close each server file descriptor
+        if (close(*listener_args_array[i].server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
+    }
+    // close worker client fds
+    for (int i = 0; i < num_workers; i++) {
+        // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
+
+        // modified to close each client file descriptor
+        if (close(*worker_args_array[i].client_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
     }
     free(listener_ports);
     exit(0);
@@ -295,18 +316,19 @@ int main(int argc, char **argv) {
     }
     print_settings();
 
-    // make space for list of ThreadArgs
-    argls = (struct ThreadArgs*) malloc(sizeof(struct ThreadArgs) * num_listener);
+    // make space for lists of Thread Arguments
+    listener_args_array = (struct ListenerThreadArgs*) malloc(sizeof(struct ListenerThreadArgs) * num_listener);
+    worker_args_array = (struct WorkerThreadArgs*) malloc(sizeof(struct WorkerThreadArgs) * num_workers);
 
     // create listener threads for num_listener
     pthread_t listeners[num_listener];
     for (int i = 0; i < num_listener; i++){
 
-        struct ThreadArgs args;
+        struct ListenerThreadArgs args;
         args.port = listener_ports[i];
-        argls[i] = args; // place struct in array
+        listener_args_array[i] = args; // place struct in listeners array
 
-        if (pthread_create(&listeners[i], NULL, listen_forever, (void*) &argls[i]) != 0){
+        if (pthread_create(&listeners[i], NULL, listen_forever, (void*) &listener_args_array[i]) != 0){
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
@@ -316,10 +338,14 @@ int main(int argc, char **argv) {
     // create worker threads for num_workers
     pthread_t workers[num_workers];
     for (int i = 0; i < num_workers; i++){
-        struct ThreadArgs args;
+        struct WorkerThreadArgs args;
         // workers don't need a port (I think)
+        // MW: I think workers DO need a port -- the port of the target. Of course, this is unchanging, but it can't hurt to save it for consistency?
+        args.port = fileserver_port;
+        worker_args_array[i] = args;
+
         // pass in a struct so each worker can create its own socket
-        if (pthread_create(&workers[i], NULL, serve_forever, (void*) &args) != 0){
+        if (pthread_create(&workers[i], NULL, serve_forever, (void*) &worker_args_array[i]) != 0){
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
