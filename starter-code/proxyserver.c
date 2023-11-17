@@ -122,13 +122,13 @@ void serve_request(int client_fd) {
 
 // pass args into a thread
 struct ListenerThreadArgs {
-    int* proxy_fd;
-    int* client_fd;
+    int proxy_fd;
+    int client_fd;
     int port;
 };
 
 struct WorkerThreadArgs {
-    int* server_fd;
+    int server_fd;
     int port;
 };
 
@@ -140,7 +140,7 @@ struct WorkerThreadArgs* worker_args_array;
 
 // TODO
 // take in void* args, convert to struct pointer for ThreadArgs
-void listen_forever(void* listener_args){
+void* listen_forever(void* listener_args){
     struct ListenerThreadArgs *args = (struct ListenerThreadArgs *) listener_args;
 
     // create a socket to listen
@@ -169,14 +169,14 @@ void listen_forever(void* listener_args){
     proxy_address.sin_port = htons(proxy_port); // listening port
 
     // bind the socket to the address and port number specified in
-    if (bind(*args->proxy_fd, (struct sockaddr *)&proxy_address,
+    if (bind(args->proxy_fd, (struct sockaddr *)&proxy_address,
              sizeof(proxy_address)) == -1) {
         perror("Failed to bind on socket");
         exit(errno);
     }
     
     // starts waiting for the client to request a connection
-    if (listen(*args->proxy_fd, 1024) == -1) {
+    if (listen(args->proxy_fd, 1024) == -1) {
         perror("Failed to listen on socket");
         exit(errno);
     }
@@ -186,7 +186,7 @@ void listen_forever(void* listener_args){
     struct sockaddr_in client_address;
     size_t client_address_length = sizeof(client_address);
     while (1) {
-        args->client_fd = accept(*args->proxy_fd,
+        args->client_fd = accept(args->proxy_fd,
                            (struct sockaddr *)&client_address,
                            (socklen_t *)&client_address_length); // listener threads
         if (args->client_fd < 0) {
@@ -217,7 +217,7 @@ void listen_forever(void* listener_args){
  */
 
 // take in void* args, convert to struct pointer for ThreadArgs
-void serve_forever(void* worker_args) {
+void* serve_forever(void* worker_args) {
     struct WorkerThreadArgs *args = (struct WorkerThreadArgs *) worker_args;
 
     // create a socket to listen
@@ -241,6 +241,7 @@ void serve_forever(void* worker_args) {
 
     // TODO consume priority queue contents with locking etc...
     serve_request(args->server_fd); // worker threads
+    return NULL;
 }
 
 /*
@@ -278,15 +279,15 @@ void signal_callback_handler(int signum) {
         // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
 
         // modified to close each server file descriptor
-        if (close(*listener_args_array[i].proxy_fd) < 0) perror("Failed to close proxy_fd (ignoring)\n");
-        if (close(*listener_args_array[i].client_fd) < 0) perror("Failed to close client_fd (ignoring)\n");
+        if (close(listener_args_array[i].proxy_fd) < 0) perror("Failed to close proxy_fd (ignoring)\n");
+        if (close(listener_args_array[i].client_fd) < 0) perror("Failed to close client_fd (ignoring)\n");
     }
     // close worker client fds
     for (int i = 0; i < num_workers; i++) {
         // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
 
         // modified to close each client file descriptor
-        if (close(*worker_args_array[i].server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
+        if (close(worker_args_array[i].server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
     }
     free(listener_ports);
     exit(0);
