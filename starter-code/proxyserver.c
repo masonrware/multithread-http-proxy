@@ -121,6 +121,7 @@ struct ListenerThreadArgs* listener_args_array;
 
 // take in void* args, convert to struct pointer for ThreadArgs
 void* listen_forever(void* listener_args){
+    printf("Listen forever\n");
     struct ListenerThreadArgs *args = (struct ListenerThreadArgs *) listener_args;
 
     // create a socket to listen
@@ -226,6 +227,7 @@ void* listen_forever(void* listener_args){
 
 // take in void* args, convert to struct pointer for ThreadArgs
 void* serve_forever(void* null) {
+    printf("Serve forever\n");
     int payload_fd;
     while(1) {
         pthread_mutex_lock(&mutex);
@@ -328,11 +330,13 @@ int main(int argc, char **argv) {
         }
     }
     print_settings();
+    printf("Parsed\n");
 
     // make space for lists of Thread Arguments
     // TODO: REMEMBER TO FREE THIS EVENTUALLY
     listener_args_array = (struct ListenerThreadArgs*) malloc(sizeof(struct ListenerThreadArgs) * num_listener);
 
+    printf("Creating listener threads\n");
     // create listener threads for num_listener
     pthread_t listeners[num_listener];
     for (int i = 0; i < num_listener; i++){
