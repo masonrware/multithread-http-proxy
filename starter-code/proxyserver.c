@@ -236,7 +236,10 @@ void* serve_forever(void* null) {
     while(1) {
         printf("SERVE LOCK\n");
         pthread_mutex_lock(&mutex);
+        int count = 0;
         while(count == 0) {
+            if (count % 50 == 0) printf("Waiting...\n");
+            count++;
             pthread_cond_wait(&fill, &mutex);
         }
         // should be get_work
