@@ -204,7 +204,7 @@ void* listen_forever(void* listener_args){
         } 
         // request is a GET request
         else {
-            printf("GET REQUEST\n");
+            printf("LISTEN LOCK\n");
             pthread_mutex_lock(&mutex);
             int count = 0;
             while(count == max_queue_size) {
@@ -212,14 +212,11 @@ void* listen_forever(void* listener_args){
                 count++;
                 pthread_cond_wait(&empty, &mutex);
             }
-            printf("PASSED WHILE\n");
             add_work(&pq, args->client_fd, request->priority);
             count+=1;
-            printf("WORK ADDED\n");
             pthread_cond_signal(&fill);
-            printf("SIGNALLED\n");
             pthread_mutex_unlock(&mutex);
-            printf("UNLOCK\n");
+            printf("LISTEN UNLOCK\n");
         }
     }
 
@@ -237,6 +234,7 @@ void* serve_forever(void* null) {
     printf("Serve forever\n");
     int payload_fd;
     while(1) {
+        printf("SERVE LOCK\n");
         pthread_mutex_lock(&mutex);
         while(count == 0) {
             pthread_cond_wait(&fill, &mutex);
@@ -246,6 +244,7 @@ void* serve_forever(void* null) {
         count-=1;
         pthread_cond_signal(&empty);
         pthread_mutex_unlock(&mutex);
+        printf("SERVE UNLOCK\n");
 
         serve_request(payload_fd);
 
