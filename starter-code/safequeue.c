@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 // change this to use the -q cla from proxyserver
 #define MAX_SIZE 100
+pthread_mutex_t qlock;
 
 // Structure to represent a node in the heap
 struct HeapNode {
@@ -17,15 +19,24 @@ struct PriorityQueue {
     int max_size;
 };
 
+// change queue creation in pserver main
+void create_queue(struct PriorityQueue *pq, int msize, int size){
+  pq->size = size;
+  pq->max_size = msize; 
+}
+
 // Function to swap two nodes in the heap
 void swap(struct HeapNode *a, struct HeapNode *b) {
+    pthread_mutex_lock(&qlock);
     struct HeapNode temp = *a;
     *a = *b;
     *b = temp;
+    pthread_mutex_unlock(&qlock);
 }
 
 // Function to heapify a subtree rooted with node i
 void maxHeapify(struct PriorityQueue *pq, int i) {
+    pthread_mutex_lock(&qlock);
     int largest = i;
     int left = 2 * i + 1;
     int right = 2 * i + 2;
@@ -40,10 +51,12 @@ void maxHeapify(struct PriorityQueue *pq, int i) {
         swap(&pq->heap[i], &pq->heap[largest]);
         maxHeapify(pq, largest);
     }
+    pthread_mutex_unlock(&qlock);
 }
 
 // Function to insert a new element with a given priority into the priority queue
-void insert(struct PriorityQueue *pq, int data, int priority) {
+void add_work(struct PriorityQueue *pq, int data, int priority) {
+    pthread_mutex_lock(&qlock);
     if (pq->size == pq->max_size) {
         printf("Priority Queue is full. Cannot insert.\n");
         return;
@@ -59,13 +72,15 @@ void insert(struct PriorityQueue *pq, int data, int priority) {
         swap(&pq->heap[i], &pq->heap[(i - 1) / 2]);
         i = (i - 1) / 2;
     }
+    pthread_mutex_unlock(&qlock);
 }
 
 // Function to extract the element with the maximum priority from the priority queue
-struct HeapNode extractMax(struct PriorityQueue *pq) {
+struct HeapNode get_work(struct PriorityQueue *pq) {
+    pthread_mutex_lock(&qlock);
     if (pq->size == 0) {
         printf("Priority Queue is empty.\n");
-        exit(1); // You may choose to handle this differently based on your requirements
+        exit(1); 
     }
 
     struct HeapNode maxNode = pq->heap[0];
@@ -77,19 +92,40 @@ struct HeapNode extractMax(struct PriorityQueue *pq) {
     }
 
     return maxNode;
+    pthread_mutex_unlock(&qlock);
+}
+
+
+struct HeapNode get_work_nonblocking(struct PriorityQueue *pq) {
+    pthread_mutex_lock(&qlock);
+    if (pq->size == 0) {
+        printf("Priority Queue is empty.\n");
+        exit(1); 
+    }
+
+    struct HeapNode maxNode = pq->heap[0];
+    pq->size--;
+
+    if (pq->size > 0) {
+        pq->heap[0] = pq->heap[pq->size];
+        maxHeapify(pq, 0);
+    }
+
+    return maxNode;
+    pthread_mutex_unlock(&qlock);
 }
 
 // Example usage
-// int main() {
-//     struct PriorityQueue pq;
-//     pq.size = 0;
+int main() {
+    struct PriorityQueue pq;
+    pq.size = 0;
 
-//     insert(&pq, 3, 2);
-//     insert(&pq, 5, 1);
-//     insert(&pq, 8, 3);
+    add_work(&pq, 3, 2);
+    add_work(&pq, 5, 1);
+    add_work(&pq, 8, 3);
 
-//     struct HeapNode maxNode = extractMax(&pq);
-//     printf("Extracted element: %d with priority %d\n", maxNode.data, maxNode.priority);
+    struct HeapNode maxNode = get_work(&pq);
+    printf("Extracted element: %d with priority %d\n", maxNode.data, maxNode.priority);
 
-//     return 0;
-//}
+    return 0;
+}

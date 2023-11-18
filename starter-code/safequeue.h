@@ -19,9 +19,11 @@ struct PriorityQueue {
 };
 
 // Function prototypes
+void create_queue(struct PriorityQueue *pq, int msize, int size);
 void swap(struct HeapNode *a, struct HeapNode *b);
 void maxHeapify(struct PriorityQueue *pq, int i);
-void insert(struct PriorityQueue *pq, int data, int priority);
-struct HeapNode extractMax(struct PriorityQueue *pq);
+void add_work(struct PriorityQueue *pq, int data, int priority);
+struct HeapNode get_work(struct PriorityQueue *pq);
+struct HeapNode get_work_nonblocking(struct PriorityQueue *pq);
 
 #endif  // PRIORITY_QUEUE_H
