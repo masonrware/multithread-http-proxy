@@ -82,7 +82,7 @@ void serve_request(int client_fd) {
     char *buffer = (char *)malloc(RESPONSE_BUFSIZE * sizeof(char));
 
     // forward the client request to the fileserver
-    int bytes_read = read(client_fd, buffer, RESPONSE_BUFSIZE);
+    int bytes_read = recv(client_fd, buffer, RESPONSE_BUFSIZE, MSG_PEEK);
     int ret = http_send_data(fileserver_fd, buffer, bytes_read);
     if (ret < 0) {
         printf("Failed to send request to the file server\n");
