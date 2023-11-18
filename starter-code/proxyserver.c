@@ -206,9 +206,13 @@ void* listen_forever(void* listener_args){
         else {
             printf("GET REQUEST\n");
             pthread_mutex_lock(&mutex);
+            int count = 0;
             while(count == max_queue_size) {
+                if (count % 50 == 0) printf("Wating...\n");
+                count++;
                 pthread_cond_wait(&empty, &mutex);
             }
+            printf("PASSED WHILE\n");
             add_work(&pq, args->client_fd, request->priority);
             count+=1;
             pthread_cond_signal(&fill);
