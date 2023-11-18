@@ -243,6 +243,8 @@ void* serve_forever(void* null) {
         close(payload_fd);
     }
 
+    pthread_mutex_unlock(&mutex);
+    
     shutdown(payload_fd, SHUT_RDWR);
     close(payload_fd);
     return null;
