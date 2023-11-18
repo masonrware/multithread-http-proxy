@@ -209,17 +209,12 @@ void* listen_forever(void* listener_args){
                 pthread_cond_wait(&empty, &mutex);
             }
             add_work(&pq, args->client_fd, request->priority);
+            count+=1;
             pthread_cond_signal(&fill);
             pthread_mutex_unlock(&mutex);
         }
-
-        // close the connection to the client
-        // shutdown(args->client_fd, SHUT_WR);
-        // close(args->client_fd);
     }
 
-    // shutdown(args->proxy_fd, SHUT_RDWR);
-    // close(args->proxy_fd);
     return NULL;
 }
 
@@ -230,28 +225,27 @@ void* listen_forever(void* listener_args){
  */
 
 // take in void* args, convert to struct pointer for ThreadArgs
-void* serve_forever(void*) {
+void* serve_forever(void* null) {
     int payload_fd;
     while(1) {
-        printf("in serving (worker) loop\n");
         pthread_mutex_lock(&mutex);
         while(count == 0) {
             pthread_cond_wait(&fill, &mutex);
         }
         payload_fd = get_work_nonblocking(&pq).data;
+        count-=1;
         serve_request(payload_fd);
         pthread_cond_signal(&empty);
         pthread_mutex_unlock(&mutex);
-
 
         // close the connection to the client
         shutdown(payload_fd, SHUT_WR);
         close(payload_fd);
     }
-    
+
     shutdown(payload_fd, SHUT_RDWR);
     close(payload_fd);
-    return NULL;
+    return null;
 }
 
 /*
@@ -353,7 +347,7 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        pthread_join(listeners[i], NULL);
+        // pthread_join(listeners[i], NULL);
     }
 
     // create worker threads for num_workers
