@@ -37,6 +37,7 @@ int max_queue_size;
 struct PriorityQueue pq;
 pthread_cond_t empty, fill;
 pthread_mutex_t mutex;
+int count;
 
 void send_error_response(int client_fd, status_code_t err_code, char *err_msg) {
     http_start_response(client_fd, err_code);
@@ -199,22 +200,26 @@ void listen_forever(void* listener_args){
         
         // request is a GET_JOB request
         if(strcmp(request->path, "/GetJob")==0) {
-
+            // TODO
         } 
         // request is a GET request
         else {
-            // TODO replace below with write to priority queue with locking etc...
-            serve_request(args->client_fd); // worker threads
+            pthread_mutex_lock(&mutex);
+            while(count == max_queue_size) {
+                pthread_cond_wait(&empty, &mutex);
+            }
+            add_work(&pq, args->client_fd, request->priority);
+            pthread_cond_signal(&fill);
+            pthread_mutex_unlock(&mutex);
         }
-        // request->priority request->delay
 
         // close the connection to the client
-        shutdown(args->client_fd, SHUT_WR);
-        close(args->client_fd);
+        // shutdown(args->client_fd, SHUT_WR);
+        // close(args->client_fd);
     }
 
-    shutdown(args->proxy_fd, SHUT_RDWR);
-    close(args->proxy_fd);
+    // shutdown(args->proxy_fd, SHUT_RDWR);
+    // close(args->proxy_fd);
 }
 
 /*
@@ -225,10 +230,17 @@ void listen_forever(void* listener_args){
 
 // take in void* args, convert to struct pointer for ThreadArgs
 void serve_forever() {
-//     while(1) {
-//         // TODO consume priority queue contents with locking etc...
-//         serve_request(//TODO: consumed fd);
-//     }
+    while(1) {
+        
+        serve_request(//TODO: consumed fd);
+
+
+        // close the connection to the client
+        shutdown(args->client_fd, SHUT_WR);
+        close(args->client_fd);
+    }
+    shutdown(args->proxy_fd, SHUT_RDWR);
+    close(args->proxy_fd);
 }
 
 /*
