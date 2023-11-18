@@ -300,6 +300,7 @@ void exit_with_usage() {
 }
 
 int main(int argc, char **argv) {
+    printf("Main\n");
     signal(SIGINT, signal_callback_handler);
 
     /* Default settings */
