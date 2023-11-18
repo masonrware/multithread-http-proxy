@@ -129,15 +129,8 @@ struct ListenerThreadArgs {
     int port;
 };
 
-struct WorkerThreadArgs {
-    int server_fd;
-    int port;
-};
-
 // array to access thread arguments globally, corresponds to num_listener
 struct ListenerThreadArgs* listener_args_array;
-// array to access thread arguments globally, corresponds to num_workers
-struct WorkerThreadArgs* worker_args_array;
 
 
 // TODO
@@ -219,31 +212,11 @@ void* listen_forever(void* listener_args){
  */
 
 // take in void* args, convert to struct pointer for ThreadArgs
-void* serve_forever(void* worker_args) {
-    struct WorkerThreadArgs *args = (struct WorkerThreadArgs *) worker_args;
-
-    // create a socket to listen
-    args->server_fd = socket(PF_INET, SOCK_STREAM, 0);
-    if (args->server_fd == -1) {
-        perror("Failed to create a new socket");
-        exit(errno);
-    }
-
-    // manipulate options for the socket
-    int socket_option = 1;
-    if (setsockopt(args->server_fd, SOL_SOCKET, SO_REUSEADDR, &socket_option,
-                   sizeof(socket_option)) == -1) {
-        perror("Failed to set socket options");
-        exit(errno);
-    }
-
-    // TODO bind socket above to target ip address and port
-    // char *fileserver_ipaddr;  int fileserver_port;
-
-
-    // TODO consume priority queue contents with locking etc...
-    serve_request(args->server_fd); // worker threads
-    return NULL;
+void* serve_forever() {
+//     while(1) {
+//         // TODO consume priority queue contents with locking etc...
+//         serve_request(//TODO: consumed fd);
+//     }
 }
 
 /*
@@ -276,20 +249,13 @@ void print_settings() {
 
 void signal_callback_handler(int signum) {
     printf("Caught signal %d: %s\n", signum, strsignal(signum));
-    // close listener server fds
+    // close listener proxy fds and client fds
     for (int i = 0; i < num_listener; i++) {
         // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
 
         // modified to close each server file descriptor
         if (close(listener_args_array[i].proxy_fd) < 0) perror("Failed to close proxy_fd (ignoring)\n");
         if (close(listener_args_array[i].client_fd) < 0) perror("Failed to close client_fd (ignoring)\n");
-    }
-    // close worker client fds
-    for (int i = 0; i < num_workers; i++) {
-        // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
-
-        // modified to close each client file descriptor
-        if (close(worker_args_array[i].server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
     }
     free(listener_ports);
     exit(0);
@@ -337,9 +303,8 @@ int main(int argc, char **argv) {
     print_settings();
 
     // make space for lists of Thread Arguments
-    // REMEMBER TO FREE THESE EVENTUALLY
+    // REMEMBER TO FREE THIS EVENTUALLY
     listener_args_array = (struct ListenerThreadArgs*) malloc(sizeof(struct ListenerThreadArgs) * num_listener);
-    worker_args_array = (struct WorkerThreadArgs*) malloc(sizeof(struct WorkerThreadArgs) * num_workers);
 
     // create listener threads for num_listener
     pthread_t listeners[num_listener];
@@ -360,12 +325,8 @@ int main(int argc, char **argv) {
     // create worker threads for num_workers
     pthread_t workers[num_workers];
     for (int i = 0; i < num_workers; i++){
-        struct WorkerThreadArgs args;
-        args.port = fileserver_port;
-        worker_args_array[i] = args;
-
         // pass in a struct so each worker can create its own socket
-        if (pthread_create(&workers[i], NULL, serve_forever, (void*) &worker_args_array[i]) != 0){
+        if (pthread_create(&workers[i], NULL, serve_forever) != 0){
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }

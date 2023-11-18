@@ -212,12 +212,12 @@ void* listen_forever(void* listener_args){
  */
 
 // take in void* args, convert to struct pointer for ThreadArgs
-// void* serve_forever() {
+void* serve_forever() {
 //     while(1) {
 //         // TODO consume priority queue contents with locking etc...
 //         serve_request(//TODO: consumed fd);
 //     }
-// }
+}
 
 /*
  * Default settings for in the global configuration variables
@@ -326,7 +326,7 @@ int main(int argc, char **argv) {
     pthread_t workers[num_workers];
     for (int i = 0; i < num_workers; i++){
         // pass in a struct so each worker can create its own socket
-        if (pthread_create(&workers[i], NULL, serve_forever, (void*) &worker_args_array[i]) != 0){
+        if (pthread_create(&workers[i], NULL, serve_forever) != 0){
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }

@@ -92,4 +92,4 @@ struct HeapNode extractMax(struct PriorityQueue *pq) {
 //     printf("Extracted element: %d with priority %d\n", maxNode.data, maxNode.priority);
 
 //     return 0;
-}
+//}
