@@ -244,7 +244,7 @@ void* serve_forever(void* null) {
         count-=1;
         pthread_cond_signal(&empty);
         pthread_mutex_unlock(&mutex);
-        printf("SERVE UNLOCK\n");
+        printf("SERVE UNLOCK 1\n");
 
         serve_request(payload_fd);
 
@@ -252,6 +252,8 @@ void* serve_forever(void* null) {
         shutdown(payload_fd, SHUT_WR);
         close(payload_fd);
     }
+    pthread_mutex_unlock(&mutex);
+    printf("SERVE UNLOCK 2\n");
 
     shutdown(payload_fd, SHUT_RDWR);
     close(payload_fd);
