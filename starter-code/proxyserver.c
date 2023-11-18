@@ -35,9 +35,10 @@ char *fileserver_ipaddr;
 int fileserver_port;
 int max_queue_size;
 struct PriorityQueue pq;
-pthread_cond_t empty, fill;
-pthread_mutex_t mutex;
-int count;
+pthread_cond_t empty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t fill = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+int count = 0;
 
 void send_error_response(int client_fd, status_code_t err_code, char *err_msg) {
     http_start_response(client_fd, err_code);
@@ -134,8 +135,6 @@ struct ListenerThreadArgs {
 // array to access thread arguments globally, corresponds to num_listener
 struct ListenerThreadArgs* listener_args_array;
 
-
-// TODO
 // take in void* args, convert to struct pointer for ThreadArgs
 void* listen_forever(void* listener_args){
     struct ListenerThreadArgs *args = (struct ListenerThreadArgs *) listener_args;
@@ -199,7 +198,7 @@ void* listen_forever(void* listener_args){
         request = parse_client_request(args->client_fd);
 
         // request is a GET_JOB request
-        if(strcmp(request->path, "/GetJob")==0) {
+        if(strcmp(request->path, GETJOBCMD)==0) {
             // TODO
         } 
         // request is a GET request
@@ -234,9 +233,10 @@ void* serve_forever(void* null) {
         }
         payload_fd = get_work_nonblocking(&pq).data;
         count-=1;
-        serve_request(payload_fd);
         pthread_cond_signal(&empty);
         pthread_mutex_unlock(&mutex);
+
+        serve_request(payload_fd);
 
         // close the connection to the client
         shutdown(payload_fd, SHUT_WR);
@@ -280,9 +280,6 @@ void signal_callback_handler(int signum) {
     printf("Caught signal %d: %s\n", signum, strsignal(signum));
     // close listener proxy fds and client fds
     for (int i = 0; i < num_listener; i++) {
-        // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
-
-        // modified to close each server file descriptor
         if (close(listener_args_array[i].proxy_fd) < 0) perror("Failed to close proxy_fd (ignoring)\n");
         if (close(listener_args_array[i].client_fd) < 0) perror("Failed to close client_fd (ignoring)\n");
     }
@@ -331,7 +328,7 @@ int main(int argc, char **argv) {
     print_settings();
 
     // make space for lists of Thread Arguments
-    // REMEMBER TO FREE THIS EVENTUALLY
+    // TODO: REMEMBER TO FREE THIS EVENTUALLY
     listener_args_array = (struct ListenerThreadArgs*) malloc(sizeof(struct ListenerThreadArgs) * num_listener);
 
     // create listener threads for num_listener
@@ -346,8 +343,6 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
-
-        // pthread_join(listeners[i], NULL);
     }
 
     // create worker threads for num_workers
@@ -358,7 +353,15 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
+    }
 
+    // join on listeners
+    for (int i = 0; i < num_listener; i++) {
+        pthread_join(listeners[i], NULL);
+    }
+
+    // join on workers
+    for (int i = 0; i < num_workers; i++) {
         pthread_join(workers[i], NULL);
     }
 
