@@ -215,8 +215,11 @@ void* listen_forever(void* listener_args){
             printf("PASSED WHILE\n");
             add_work(&pq, args->client_fd, request->priority);
             count+=1;
+            printf("WORK ADDED\n");
             pthread_cond_signal(&fill);
+            printf("SIGNALLED\n");
             pthread_mutex_unlock(&mutex);
+            printf("UNLOCK\n");
         }
     }
 
