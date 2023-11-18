@@ -209,13 +209,16 @@ void listen_forever(void* listener_args){
         struct parsed_request *request = malloc(sizeof(struct parsed_request));
         request = parse_client_request(args->client_fd);
         
-        printf("IN PROXYSERVER: Parsed HTTP request:\n");
-        printf("Path: '%s'\n", request->path);
-        printf("Priority: '%d'\n", request->priority);
-        printf("Delay: '%d'\n\n", request->delay);
+        // request is a GET_JOB request
+        if(strcmp(request->path, "/GetJob")==0) {
 
-        // TODO replace below with write to priority queue with locking etc...
-        serve_request(args->client_fd); // worker threads
+        } 
+        // request is a GET request
+        else {
+            // TODO replace below with write to priority queue with locking etc...
+            serve_request(args->client_fd); // worker threads
+        }
+        // request->priority request->delay
 
         // close the connection to the client
         shutdown(args->client_fd, SHUT_WR);
