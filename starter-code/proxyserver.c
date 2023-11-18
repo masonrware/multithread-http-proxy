@@ -41,6 +41,7 @@ struct PriorityQueue pq;
 pthread_cond_t empty;
 pthread_cond_t fill;
 pthread_mutex_t mutex;
+pthread_mutex_t qlock;
 int count = 0;
 
 void send_error_response(int client_fd, status_code_t err_code, char *err_msg) {
@@ -221,7 +222,9 @@ void* listen_forever(void* listener_args){
                 count++;
                 pthread_cond_wait(&empty, &mutex);
             }
+            pthread_mutex_lock(&qlock);
             add_work(&pq, args->client_fd, request->priority);
+            pthread_mutex_unlock(&qlock);
             count+=1;
             pthread_cond_signal(&fill);
             pthread_mutex_unlock(&mutex);
@@ -252,7 +255,9 @@ void* serve_forever(void* null) {
             pthread_cond_wait(&fill, &mutex);
         }
         // should be get_work
+        pthread_mutex_lock(&qlock);
         payload_fd = get_work(&pq).data;
+        pthread_mutex_unlock(&qlock);
         count-=1;
         pthread_cond_signal(&empty);
         pthread_mutex_unlock(&mutex);
@@ -327,6 +332,7 @@ int main(int argc, char **argv) {
     default_settings();
 
     pthread_mutex_init(&mutex, NULL);
+    pthread_mutex_init(&qlock, NULL);
     pthread_cond_init(&empty, NULL);
     pthread_cond_init(&fill, NULL);
 
