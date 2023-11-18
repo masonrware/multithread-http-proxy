@@ -13,6 +13,15 @@ typedef enum scode {
 #define GETJOBCMD "/GetJob"
 
 /*
+* struct for viewing the contents of a parsed request in proxyserver.c
+*/
+struct parsed_request {
+    int delay;
+    int priority;
+    char *path;
+};
+
+/*
  * A simple HTTP library.
  *
  * Usage example:
@@ -30,7 +39,6 @@ typedef enum scode {
  *
  *     close(fd);
  */
-
 
 /*
  * Functions for parsing an HTTP request.
@@ -174,7 +182,8 @@ char *http_get_response_message(int status_code) {
     }
 }
 
-void parse_client_request(int fd) {
+struct parsed_request* parse_client_request(int fd) {
+    struct parsed_request *request = malloc(sizeof(struct parsed_request));
     char *read_buffer = malloc(LIBHTTP_REQUEST_MAX_SIZE + 1);
     if (!read_buffer) http_fatal_error("Malloc failed");
 
@@ -222,13 +231,13 @@ void parse_client_request(int fd) {
         token = strtok(NULL, "\r\n");
     }
 
-    printf("\n\tParsed HTTP request:\n");
-    printf("\tPath: '%s'\n", path);
-    printf("\tPriority: '%d'\n", priority);
-    printf("\tDelay: '%d'\n\n", delay);
+    request->path = path;
+    request->priority = priority;
+    request->delay = delay;
 
     free(read_buffer);
-    return;
+
+    return request;
 }
 
 

@@ -52,18 +52,22 @@ void send_error_response(int client_fd, status_code_t err_code, char *err_msg) {
  */
 void serve_request(int client_fd) {
 
+    printf(">in serve req\n");
     // create a fileserver socket
     int fileserver_fd = socket(PF_INET, SOCK_STREAM, 0);
     if (fileserver_fd == -1) {
         fprintf(stderr, "Failed to create a new socket: error %d: %s\n", errno, strerror(errno));
         exit(errno);
     }
+    printf(">created socket\n");
 
     // create the full fileserver address
     struct sockaddr_in fileserver_address;
     fileserver_address.sin_addr.s_addr = inet_addr(fileserver_ipaddr);
     fileserver_address.sin_family = AF_INET;
     fileserver_address.sin_port = htons(fileserver_port);
+
+    printf(">created addr\n");
 
     // connect to the fileserver
     int connection_status = connect(fileserver_fd, (struct sockaddr *)&fileserver_address,
@@ -75,23 +79,32 @@ void serve_request(int client_fd) {
         return;
     }
 
+    printf(">connected\n");
+
     // successfully connected to the file server
     char *buffer = (char *)malloc(RESPONSE_BUFSIZE * sizeof(char));
 
+    printf("%d\n", client_fd);
     // forward the client request to the fileserver
     int bytes_read = read(client_fd, buffer, RESPONSE_BUFSIZE);
+    printf(">read bytes\n");
     int ret = http_send_data(fileserver_fd, buffer, bytes_read);
+    printf(">sent data\n");
     if (ret < 0) {
         printf("Failed to send request to the file server\n");
         send_error_response(client_fd, BAD_GATEWAY, "Bad Gateway");
 
     } else {
+        printf(">sending buffer\n");
         // forward the fileserver response to the client
         while (1) {
+            printf(">in while loop\n");
             int bytes_read = recv(fileserver_fd, buffer, RESPONSE_BUFSIZE - 1, 0);
+            printf(">read bytes\n");
             if (bytes_read <= 0) // fileserver_fd has been closed, break
                 break;
             ret = http_send_data(client_fd, buffer, bytes_read);
+            printf(">sent data\n");
             if (ret < 0) { // write failed, client_fd has been closed
                 break;
             }
@@ -193,6 +206,14 @@ void listen_forever(void* listener_args){
                inet_ntoa(client_address.sin_addr),
                client_address.sin_port);
         
+        struct parsed_request *request = malloc(sizeof(struct parsed_request));
+        request = parse_client_request(args->client_fd);
+        
+        printf("IN PROXYSERVER: Parsed HTTP request:\n");
+        printf("Path: '%s'\n", request->path);
+        printf("Priority: '%d'\n", request->priority);
+        printf("Delay: '%d'\n\n", request->delay);
+
         // TODO replace below with write to priority queue with locking etc...
         serve_request(args->client_fd); // worker threads
 
