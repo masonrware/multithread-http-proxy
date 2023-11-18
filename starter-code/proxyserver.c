@@ -197,22 +197,11 @@ void listen_forever(void* listener_args){
         
         struct parsed_request *request = malloc(sizeof(struct parsed_request));
         request = parse_client_request(args->client_fd);
-        
-        // request is a GET_JOB request
-        if(strcmp(request->path, "/GetJob")==0) {
-            // TODO
-        } 
-        // request is a GET request
-        else {
-            pthread_mutex_lock(&mutex);
-            while(count == max_queue_size) {
-                pthread_cond_wait(&empty, &mutex);
-            }
-            add_work(&pq, args->client_fd, request->priority);
-            pthread_cond_signal(&fill);
-            pthread_mutex_unlock(&mutex);
-        }
 
+        serve_request(args->client_fd);
+
+        strcmp(request->path, "/GetJob");
+        
         // close the connection to the client
         // shutdown(args->client_fd, SHUT_WR);
         // close(args->client_fd);
@@ -230,17 +219,17 @@ void listen_forever(void* listener_args){
 
 // take in void* args, convert to struct pointer for ThreadArgs
 void serve_forever() {
-    while(1) {
+    // while(1) {
         
-        serve_request(//TODO: consumed fd);
+    //     serve_request(//TODO: consumed fd);
 
 
-        // close the connection to the client
-        shutdown(args->client_fd, SHUT_WR);
-        close(args->client_fd);
-    }
-    shutdown(args->proxy_fd, SHUT_RDWR);
-    close(args->proxy_fd);
+    //     // close the connection to the client
+    //     shutdown(args->client_fd, SHUT_WR);
+    //     close(args->client_fd);
+    // }
+    // shutdown(args->proxy_fd, SHUT_RDWR);
+    // close(args->proxy_fd);
 }
 
 /*
