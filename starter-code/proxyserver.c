@@ -90,7 +90,10 @@ void serve_request(int client_fd) {
 
     } else {
         // forward the fileserver response to the client
+        int c = 0;
         while (1) {
+            if (c % 50 == 0) printf("serve request...\n");
+            c++;
             int bytes_read = recv(fileserver_fd, buffer, RESPONSE_BUFSIZE - 1, 0);
             if (bytes_read <= 0) // fileserver_fd has been closed, break
                 break;
@@ -166,7 +169,10 @@ void* listen_forever(void* listener_args){
 
     struct sockaddr_in client_address;
     size_t client_address_length = sizeof(client_address);
+    int c = 0;
     while (1) {
+        if (c % 50 == 0) printf("listening...\n");
+        c++;
         args->client_fd = accept(args->proxy_fd,
                            (struct sockaddr *)&client_address,
                            (socklen_t *)&client_address_length); // listener threads
@@ -208,7 +214,7 @@ void* listen_forever(void* listener_args){
             pthread_mutex_lock(&mutex);
             int count = 0;
             while(count == max_queue_size) {
-                if (count % 50 == 0) printf("Wating...\n");
+                if (count % 50 == 0) printf("[listen] Wating...\n");
                 count++;
                 pthread_cond_wait(&empty, &mutex);
             }
@@ -236,10 +242,10 @@ void* serve_forever(void* null) {
     while(1) {
         printf("SERVE LOCK\n");
         pthread_mutex_lock(&mutex);
-        // int count = 0;
+        int count = 0;
         while(count == 0) {
-            // if (count % 50 == 0) printf("Waiting...\n");
-            // count++;
+            if (count % 50 == 0) printf("[serve] Waiting...\n");
+            count++;
             pthread_cond_wait(&fill, &mutex);
         }
         // should be get_work
