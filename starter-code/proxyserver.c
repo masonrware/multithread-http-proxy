@@ -35,9 +35,12 @@ char *fileserver_ipaddr;
 int fileserver_port;
 int max_queue_size;
 struct PriorityQueue pq;
-pthread_cond_t empty = PTHREAD_COND_INITIALIZER;
-pthread_cond_t fill = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+// pthread_cond_t empty = PTHREAD_COND_INITIALIZER;
+// pthread_cond_t fill = PTHREAD_COND_INITIALIZER;
+// pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t empty;
+pthread_cond_t fill;
+pthread_mutex_t mutex;
 int count = 0;
 
 void send_error_response(int client_fd, status_code_t err_code, char *err_msg) {
@@ -322,6 +325,10 @@ int main(int argc, char **argv) {
 
     /* Default settings */
     default_settings();
+
+    pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&empty, NULL);
+    pthread_cond_init(&fill, NULL);
 
     int i;
     for (i = 1; i < argc; i++) {
