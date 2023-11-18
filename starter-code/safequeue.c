@@ -4,7 +4,7 @@
 
 // change this to use the -q cla from proxyserver
 #define MAX_SIZE 100
-pthread_mutex_t qlock;
+pthread_mutex_t qlock = PTHREAD_MUTEX_INITIALIZER;
 
 // Structure to represent a node in the heap
 struct HeapNode {
