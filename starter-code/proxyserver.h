@@ -183,7 +183,7 @@ char *http_get_response_message(int status_code) {
 }
 
 struct parsed_request* parse_client_request(int fd) {
-    struct parsed_request *request = malloc(sizeof(struct parsed_request));
+    struct parsed_request *request = (struct parsed_request *)malloc(sizeof(struct parsed_request));
     char *read_buffer = malloc(LIBHTTP_REQUEST_MAX_SIZE + 1);
     if (!read_buffer) http_fatal_error("Malloc failed");
 
