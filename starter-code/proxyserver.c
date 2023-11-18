@@ -137,7 +137,7 @@ struct ListenerThreadArgs* listener_args_array;
 
 // TODO
 // take in void* args, convert to struct pointer for ThreadArgs
-void listen_forever(void* listener_args){
+void* listen_forever(void* listener_args){
     struct ListenerThreadArgs *args = (struct ListenerThreadArgs *) listener_args;
 
     // create a socket to listen
@@ -198,10 +198,21 @@ void listen_forever(void* listener_args){
         struct parsed_request *request = malloc(sizeof(struct parsed_request));
         request = parse_client_request(args->client_fd);
 
-        serve_request(args->client_fd);
+        // request is a GET_JOB request
+        if(strcmp(request->path, "/GetJob")==0) {
+            // TODO
+        } 
+        // request is a GET request
+        else {
+            pthread_mutex_lock(&mutex);
+            while(count == max_queue_size) {
+                pthread_cond_wait(&empty, &mutex);
+            }
+            add_work(&pq, args->client_fd, request->priority);
+            pthread_cond_signal(&fill);
+            pthread_mutex_unlock(&mutex);
+        }
 
-        strcmp(request->path, "/GetJob");
-        
         // close the connection to the client
         // shutdown(args->client_fd, SHUT_WR);
         // close(args->client_fd);
@@ -209,6 +220,7 @@ void listen_forever(void* listener_args){
 
     // shutdown(args->proxy_fd, SHUT_RDWR);
     // close(args->proxy_fd);
+    return NULL;
 }
 
 /*
@@ -218,18 +230,28 @@ void listen_forever(void* listener_args){
  */
 
 // take in void* args, convert to struct pointer for ThreadArgs
-void serve_forever() {
-    // while(1) {
-        
-    //     serve_request(//TODO: consumed fd);
+void* serve_forever(void*) {
+    int payload_fd;
+    while(1) {
+        printf("in serving (worker) loop\n");
+        pthread_mutex_lock(&mutex);
+        while(count == 0) {
+            pthread_cond_wait(&fill, &mutex);
+        }
+        payload_fd = get_work_nonblocking(&pq).data;
+        serve_request(payload_fd);
+        pthread_cond_signal(&empty);
+        pthread_mutex_unlock(&mutex);
 
 
-    //     // close the connection to the client
-    //     shutdown(args->client_fd, SHUT_WR);
-    //     close(args->client_fd);
-    // }
-    // shutdown(args->proxy_fd, SHUT_RDWR);
-    // close(args->proxy_fd);
+        // close the connection to the client
+        shutdown(payload_fd, SHUT_WR);
+        close(payload_fd);
+    }
+    
+    shutdown(payload_fd, SHUT_RDWR);
+    close(payload_fd);
+    return NULL;
 }
 
 /*
