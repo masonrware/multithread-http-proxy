@@ -187,7 +187,7 @@ struct parsed_request* parse_client_request(int fd) {
     char *read_buffer = malloc(LIBHTTP_REQUEST_MAX_SIZE + 1);
     if (!read_buffer) http_fatal_error("Malloc failed");
 
-    int bytes_read = read(fd, read_buffer, LIBHTTP_REQUEST_MAX_SIZE);
+    int bytes_read = recv(fd, read_buffer, LIBHTTP_REQUEST_MAX_SIZE, MSG_PEEK);
     read_buffer[bytes_read] = '\0'; /* Always null-terminate. */
     printf("read buffer %s\n\n", read_buffer);
 
