@@ -135,7 +135,7 @@ struct ListenerThreadArgs* listener_args_array;
 
 // TODO
 // take in void* args, convert to struct pointer for ThreadArgs
-void* listen_forever(void* listener_args){
+void listen_forever(void* listener_args){
     struct ListenerThreadArgs *args = (struct ListenerThreadArgs *) listener_args;
 
     // create a socket to listen
@@ -212,7 +212,7 @@ void* listen_forever(void* listener_args){
  */
 
 // take in void* args, convert to struct pointer for ThreadArgs
-void* serve_forever() {
+void serve_forever() {
 //     while(1) {
 //         // TODO consume priority queue contents with locking etc...
 //         serve_request(//TODO: consumed fd);
@@ -314,7 +314,7 @@ int main(int argc, char **argv) {
         args.port = listener_ports[i];
         listener_args_array[i] = args; // place struct in listeners array
 
-        if (pthread_create(&listeners[i], NULL, listen_forever, (void*) &listener_args_array[i]) != 0){
+        if (pthread_create(&listeners[i], NULL, (void *) listen_forever, (void*) &listener_args_array[i]) != 0){
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
@@ -326,7 +326,7 @@ int main(int argc, char **argv) {
     pthread_t workers[num_workers];
     for (int i = 0; i < num_workers; i++){
         // pass in a struct so each worker can create its own socket
-        if (pthread_create(&workers[i], NULL, serve_forever) != 0){
+        if (pthread_create(&workers[i], NULL, (void *) serve_forever, NULL) != 0){
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
