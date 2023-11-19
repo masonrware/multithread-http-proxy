@@ -238,15 +238,17 @@ void* listen_forever(void* listener_args){
                 pthread_cond_wait(&empty, &mutex);
             }
             pthread_mutex_lock(&qlock);
+
+            // TODO: maybe replace the below with similar count comparison as above for empty...
             if(add_work(&pq, args->client_fd, request->priority) < 0) {
                 send_error_response(args->client_fd, QUEUE_FULL, "Queue Full");
                 pthread_mutex_unlock(&qlock);
             } else {
                 pthread_mutex_unlock(&qlock);
                 count+=1;
-                pthread_cond_signal(&fill);
             }
 
+            pthread_cond_signal(&fill);
             pthread_mutex_unlock(&mutex);
             printf("LISTEN UNLOCK\n");
         }
