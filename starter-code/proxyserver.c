@@ -234,7 +234,7 @@ void* listen_forever(void* listener_args){
             int count = 0;
             while(count == max_queue_size) {
                 // if (count % 50 == 0) printf("[listen] Wating...\n");
-                // count++;
+                count+=1;
                 pthread_cond_wait(&empty, &mutex);
             }
             pthread_mutex_lock(&qlock);
@@ -267,13 +267,13 @@ void* serve_forever(void* null) {
         int count = 0;
         while(count == 0) {
             // if (count % 50 == 0) printf("[serve] Waiting...\n");
-            // count++;
+            count+=1;
             pthread_cond_wait(&fill, &mutex);
         }
         pthread_mutex_lock(&qlock);
         payload_fd = get_work(&pq).data;
         pthread_mutex_unlock(&qlock);
-        
+
         count-=1;
         pthread_cond_signal(&empty);
         pthread_mutex_unlock(&mutex);
