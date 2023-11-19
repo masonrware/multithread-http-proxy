@@ -9,6 +9,7 @@
 struct HeapNode {
     int data;
     int priority;
+    int status_code;
 };
 
 // Structure to represent the priority queue
@@ -23,7 +24,7 @@ void create_queue(struct PriorityQueue *pq, int msize, int size);
 void swap(struct HeapNode *a, struct HeapNode *b);
 void maxHeapify(struct PriorityQueue *pq, int i);
 void add_work(struct PriorityQueue *pq, int data, int priority);
-struct HeapNode get_work(struct PriorityQueue *pq);
+struct HeapNode get_work(struct PriorityQueue *pq, pthread_cond_t fill, pthread_mutex_t mutex);
 struct HeapNode get_work_nonblocking(struct PriorityQueue *pq);
 
 #endif  // PRIORITY_QUEUE_H
