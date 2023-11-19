@@ -279,6 +279,13 @@ void* serve_forever(void* null) {
 
         serve_request(payload_fd);
 
+        struct parsed_request *payload = malloc(sizeof(struct parsed_request));
+        payload = parse_client_request(payload_fd);
+
+        if(payload->delay > 0) {
+            sleep(payload->delay);
+        }
+
         // close the connection to the client
         shutdown(payload_fd, SHUT_WR);
         close(payload_fd);
