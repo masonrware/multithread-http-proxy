@@ -11,17 +11,17 @@ pthread_cond_t fill;
 pthread_mutex_t mutex;
 
 // Structure to represent a node in the heap
-struct HeapNode {
-    int data;
-    int priority;
-};
+// struct HeapNode {
+//     int data;
+//     int priority;
+// };
 
-// Structure to represent the priority queue
-struct PriorityQueue {
-    struct HeapNode heap[MAX_SIZE];
-    int size;
-    int max_size;
-};
+// // Structure to represent the priority queue
+// struct PriorityQueue {
+//     struct HeapNode heap[MAX_SIZE];
+//     int size;
+//     int max_size;
+// };
 
 // change queue creation in pserver main
 void create_queue(struct PriorityQueue *pq, int msize, int size){
