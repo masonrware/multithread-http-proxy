@@ -196,6 +196,7 @@ void* listen_forever(void* listener_args){
         if(strcmp(request->path, GETJOBCMD)==0) {
             printf("GETJOB\n");
             if (pq.size > 0){
+                printf("PQ NOT EMPTY\n");
                 int payload_fd;
                 pthread_mutex_lock(&mutex);
                 payload_fd = get_work(&pq).data;
@@ -217,6 +218,7 @@ void* listen_forever(void* listener_args){
                 close(payload_fd);
             }
             else {
+                printf("PQ EMPTY\n");
                 send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
             }
         } 
