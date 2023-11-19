@@ -76,12 +76,14 @@ void add_work(struct PriorityQueue *pq, int data, int priority) {
 }
 
 // Function to extract the element with the maximum priority from the priority queue
-struct HeapNode get_work(struct PriorityQueue *pq, pthread_cond_t fill, pthread_mutex_t mutex) {
-    pthread_mutex_lock(&mutex);
-    while (pq->size == 0) {
-        pthread_cond_wait(&fill, &mutex);
-    }
-    pthread_mutex_unlock(&mutex);
+struct HeapNode get_work(struct PriorityQueue *pq) {
+    // pthread_cond_t fill, pthread_mutex_t mutex
+    
+    // pthread_mutex_lock(&mutex);
+    // while (pq->size == 0) {
+    //     pthread_cond_wait(&fill, &mutex);
+    // }
+    // pthread_mutex_unlock(&mutex);
 
     struct HeapNode maxNode = pq->heap[0];
     pq->size--;

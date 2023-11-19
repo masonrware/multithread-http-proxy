@@ -193,6 +193,7 @@ void* listen_forever(void* listener_args){
         if(strcmp(request->path, GETJOBCMD)==0) {
             if(pq.size > 0) {
                 pthread_mutex_lock(&mutex);
+                printf("LISTEN GETJOB ACQUIRED\n");
 
                 pthread_mutex_lock(&qlock);
                 // CALL TO NON BLOCKING VERSION
@@ -225,9 +226,14 @@ void* listen_forever(void* listener_args){
         } 
         // request is GET, add fd to queue - worker will facilitate serving
         else {
-            if(pq.size != pq.max_size) {
+            printf("%d %d\n", pq.size, max_queue_size);
+            if(pq.size != max_queue_size) {
                 pthread_mutex_lock(&mutex);
 
+                while(count == max_queue_size) {
+                    pthread_cond_wait(&empty, &mutex);
+                }
+                
                 pthread_mutex_lock(&qlock);
                 add_work(&pq, args->client_fd, request->priority);
                 count+=1;
@@ -257,13 +263,20 @@ void* serve_forever(void* null) {
     int payload_fd;
     while(1) {
         pthread_mutex_lock(&mutex);
-        
+
         // CALL TO BLOCKING VERSION
+        printf("waiting for get in serve\n");
+        while(count == 0) {
+            pthread_cond_wait(&fill, &mutex);
+        }
         pthread_mutex_lock(&qlock);
-        int payload_fd = get_work(&pq, fill, mutex).data;
+        int payload_fd = get_work(&pq).data;
+        // fill, mutex
+        printf("got in serve\n");
         count-=1;
         pthread_mutex_unlock(&qlock);
 
+        pthread_cond_signal(&empty);
         pthread_mutex_unlock(&mutex);
 
         serve_request(payload_fd);
