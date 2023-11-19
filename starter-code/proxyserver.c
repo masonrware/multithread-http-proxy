@@ -195,22 +195,30 @@ void* listen_forever(void* listener_args){
         // request is a GET_JOB request
         if(strcmp(request->path, GETJOBCMD)==0) {
             printf("GETJOB\n");
-            // if (pq.size > 0){
-            //     int payload_fd;
-            //     pthread_mutex_lock(&mutex);
-            //     payload_fd = get_work(&pq).data;
-            //     count-=1;
-            //     pthread_mutex_unlock(&mutex);
+            if (pq.size > 0){
+                int payload_fd;
+                pthread_mutex_lock(&mutex);
+                payload_fd = get_work(&pq).data;
+                count-=1;
+                pthread_mutex_unlock(&mutex);
 
-            //     // serve_request(payload_fd);
+                struct parsed_request *qpop = malloc(sizeof(struct parsed_request));
+                qpop = parse_client_request(payload_fd);
 
-            //     // close the connection to the client
-            //     shutdown(payload_fd, SHUT_WR);
-            //     close(payload_fd);
-            // }
-            // else {
-            //     send_error_response()
-            // }
+                // don't know what 3rd arg should be
+                int ret = http_send_data(args->client_fd, qpop->path, 64);
+                if (ret < 0) {
+                    printf("Failed to send request to the file server\n");
+                    send_error_response(args->client_fd, BAD_GATEWAY, "Bad Gateway");
+                }
+
+                // close the connection to the client
+                shutdown(payload_fd, SHUT_WR);
+                close(payload_fd);
+            }
+            else {
+                send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
+            }
         } 
         // request is a GET request
         else {
@@ -254,7 +262,6 @@ void* serve_forever(void* null) {
             count++;
             pthread_cond_wait(&fill, &mutex);
         }
-        // should be get_work
         pthread_mutex_lock(&qlock);
         payload_fd = get_work(&pq).data;
         pthread_mutex_unlock(&qlock);
@@ -381,7 +388,7 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
-    printf("Created %d listenters\n", num_listener);
+    printf("Created %d listeners\n", num_listener);
 
     // create worker threads for num_workers
     pthread_t workers[num_workers];
