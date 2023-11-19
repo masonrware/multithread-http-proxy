@@ -197,12 +197,14 @@ void* listen_forever(void* listener_args){
             printf("GETJOB\n");
             // if (count > 0){
                 printf("PQ NOT EMPTY\n");
+
                 struct HeapNode payload;
-                int payload_fd;
+                int payload_fd = 0;
+
                 pthread_mutex_lock(&mutex);
                 payload = get_work(&pq);
                 // payload_fd = get_work(&pq).data;
-                if (payload.status_code = 1) {
+                if (payload.status_code == 1) {
                     send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
                 } else {
                     payload_fd = payload.data;
@@ -271,8 +273,10 @@ void* listen_forever(void* listener_args){
 // take in void* args, convert to struct pointer for ThreadArgs
 void* serve_forever(void* null) {
     printf("Serve forever\n");
+
     struct HeapNode payload;
-    int payload_fd;
+    int payload_fd = 0;
+    
     while(1) {
         printf("SERVE LOCK\n");
         pthread_mutex_lock(&mutex);
@@ -285,7 +289,7 @@ void* serve_forever(void* null) {
         pthread_mutex_lock(&qlock);
         payload = get_work(&pq);
         // payload_fd = get_work(&pq).data;
-        if (payload.status_code = 1) {
+        if (payload.status_code == 1) {
             send_error_response(payload.data, QUEUE_EMPTY, "Queue Empty");
         } else {
             payload_fd = payload.data;
