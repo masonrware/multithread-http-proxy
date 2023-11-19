@@ -238,7 +238,10 @@ void* listen_forever(void* listener_args){
                 pthread_cond_wait(&empty, &mutex);
             }
             pthread_mutex_lock(&qlock);
-            add_work(&pq, args->client_fd, request->priority);
+            if(add_work(&pq, args->client_fd, request->priority) < 0) {
+                send_error_response(args->client_fd, QUEUE_FULL, "Queue Full");
+                pthread_mutex_unlock(&qlock);
+            }
             pthread_mutex_unlock(&qlock);
 
             count+=1;

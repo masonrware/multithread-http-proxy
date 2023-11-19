@@ -60,12 +60,11 @@ void maxHeapify(struct PriorityQueue *pq, int i) {
 }
 
 // Function to insert a new element with a given priority into the priority queue
-void add_work(struct PriorityQueue *pq, int data, int priority) {
+int add_work(struct PriorityQueue *pq, int data, int priority) {
     // printf("ADD LOCK\n");
     // pthread_mutex_lock(&qlock);
     if (pq->size == pq->max_size) {
-        printf("Priority Queue is full. Cannot insert.\n");
-        return;
+        return -1;
     }
 
     int i = pq->size;
@@ -78,6 +77,8 @@ void add_work(struct PriorityQueue *pq, int data, int priority) {
         swap(&pq->heap[i], &pq->heap[(i - 1) / 2]);
         i = (i - 1) / 2;
     }
+
+    return 0;
     // pthread_mutex_unlock(&qlock);
     // printf("ADD UNLOCK\n");
 }
