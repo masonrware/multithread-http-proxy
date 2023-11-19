@@ -195,36 +195,37 @@ void* listen_forever(void* listener_args){
         // request is a GET_JOB request
         if(strcmp(request->path, GETJOBCMD)==0) {
             printf("GETJOB\n");
-            
-            int payload_fd;
-            pthread_mutex_lock(&mutex);
-            // CALL TO BLOCKING VERSION
-            payload_fd = get_work(&pq, empty, fill, mutex).data;
-            count-=1;
-            pthread_mutex_unlock(&mutex);
+            if (count > 0){
+                printf("PQ NOT EMPTY\n");
+                int payload_fd;
+                pthread_mutex_lock(&mutex);
+                payload_fd = get_work(&pq).data;
+                count-=1;
+                pthread_mutex_unlock(&mutex);
 
-            struct parsed_request *qpop = malloc(sizeof(struct parsed_request));
-            qpop = parse_client_request(payload_fd);
+                struct parsed_request *qpop = malloc(sizeof(struct parsed_request));
+                qpop = parse_client_request(payload_fd);
 
-            // don't know what 3rd arg should be
-            int ret = http_send_data(args->client_fd, qpop->path, 64);
-            if (ret < 0) {
-                printf("Failed to send request to the file server\n");
-                send_error_response(args->client_fd, BAD_GATEWAY, "Bad Gateway");
+                // don't know what 3rd arg should be
+                int ret = http_send_data(args->client_fd, qpop->path, 64);
+                if (ret < 0) {
+                    printf("Failed to send request to the file server\n");
+                    send_error_response(args->client_fd, BAD_GATEWAY, "Bad Gateway");
+                }
+
+                // close the connection to the client
+                shutdown(payload_fd, SHUT_WR);
+                close(payload_fd);
+
+                shutdown(args->client_fd, SHUT_WR);
+                close(args->client_fd);
             }
-
-            // close the connection to the client
-            shutdown(payload_fd, SHUT_WR);
-            close(payload_fd);
-
-            shutdown(args->client_fd, SHUT_WR);
-            close(args->client_fd);
-            // else {
-            //     printf("PQ EMPTY\n");
-            //     send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
-            //     shutdown(args->client_fd, SHUT_WR);
-            //     close(args->client_fd);
-            // }
+            else {
+                printf("PQ EMPTY\n");
+                send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
+                shutdown(args->client_fd, SHUT_WR);
+                close(args->client_fd);
+            }
         } 
         // request is a GET request
         else {
@@ -237,7 +238,8 @@ void* listen_forever(void* listener_args){
                 pthread_cond_wait(&empty, &mutex);
             }
             pthread_mutex_lock(&qlock);
-            
+
+            // TODO: maybe replace the below with similar count comparison as above for empty...
             if(add_work(&pq, args->client_fd, request->priority) < 0) {
                 send_error_response(args->client_fd, QUEUE_FULL, "Queue Full");
                 pthread_mutex_unlock(&qlock);
@@ -275,34 +277,27 @@ void* serve_forever(void* null) {
             pthread_cond_wait(&fill, &mutex);
         }
         pthread_mutex_lock(&qlock);
-        // if (pq.size > 0) {
-            payload_fd = get_work_nonblocking(&pq).data;
-            pthread_mutex_unlock(&qlock);
+        // TODO check for empty here??
+        payload_fd = get_work(&pq).data;
+        pthread_mutex_unlock(&qlock);
 
-            count-=1;
-            pthread_cond_signal(&empty);
-            pthread_mutex_unlock(&mutex);
-            printf("SERVE UNLOCK 1\n");
+        count-=1;
+        pthread_cond_signal(&empty);
+        pthread_mutex_unlock(&mutex);
+        printf("SERVE UNLOCK 1\n");
 
-            serve_request(payload_fd);
+        serve_request(payload_fd);
 
-            struct parsed_request *payload = malloc(sizeof(struct parsed_request));
-            payload = parse_client_request(payload_fd);
+        struct parsed_request *payload = malloc(sizeof(struct parsed_request));
+        payload = parse_client_request(payload_fd);
 
-            if(payload->delay > 0) {
-                sleep(payload->delay);
-            }
+        if(payload->delay > 0) {
+            sleep(payload->delay);
+        }
 
-            // close the connection to the client
-            shutdown(payload_fd, SHUT_WR);
-            close(payload_fd);
-        // } else {
-            // TODO how to do this?????
-            // printf("PQ EMPTY\n");
-            // send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
-            // shutdown(args->client_fd, SHUT_WR);
-            // close(args->client_fd);
-        // }
+        // close the connection to the client
+        shutdown(payload_fd, SHUT_WR);
+        close(payload_fd);
     }
     pthread_mutex_unlock(&mutex);
     printf("SERVE UNLOCK 2\n");

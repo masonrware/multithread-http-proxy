@@ -2,12 +2,10 @@
 #include <stdlib.h>
 #include <pthread.h>
 
-
 // change this to use the -q cla from proxyserver
 #define MAX_SIZE 100
-// pthread_cond_t empty;
-// pthread_cond_t fill;
-// pthread_mutex_t mutex;
+// pthread_mutex_t qlock;
+
 
 // Structure to represent a node in the heap
 struct HeapNode {
@@ -86,27 +84,9 @@ int add_work(struct PriorityQueue *pq, int data, int priority) {
 }
 
 // Function to extract the element with the maximum priority from the priority queue
-struct HeapNode get_work(struct PriorityQueue *pq, pthread_cond_t empty, pthread_cond_t fill, pthread_mutex_t mutex) {
-    pthread_mutex_lock(&mutex);
-    while (pq->size == 0) {
-        pthread_cond_wait(&fill, &mutex);
-    }
-    pthread_cond_signal(&empty);
-    pthread_mutex_unlock(&mutex);
-
-    struct HeapNode maxNode = pq->heap[0];
-    pq->size--;
-
-    if (pq->size > 0) {
-        pq->heap[0] = pq->heap[pq->size];
-        maxHeapify(pq, 0);
-    }
-
-    return maxNode;
-}
-
-
-struct HeapNode get_work_nonblocking(struct PriorityQueue *pq) {
+struct HeapNode get_work(struct PriorityQueue *pq) {
+    // printf("GET LOCK\n");
+    // pthread_mutex_lock(&qlock);
     if (pq->size == 0) {
         printf("Priority Queue is empty.\n");
         exit(1); 
@@ -121,6 +101,28 @@ struct HeapNode get_work_nonblocking(struct PriorityQueue *pq) {
     }
 
     return maxNode;
+    // pthread_mutex_unlock(&qlock);
+    // printf("GET UNLOCK\n");
+}
+
+
+struct HeapNode get_work_nonblocking(struct PriorityQueue *pq) {
+    // pthread_mutex_lock(&qlock);
+    if (pq->size == 0) {
+        printf("Priority Queue is empty.\n");
+        exit(1); 
+    }
+
+    struct HeapNode maxNode = pq->heap[0];
+    pq->size--;
+
+    if (pq->size > 0) {
+        pq->heap[0] = pq->heap[pq->size];
+        maxHeapify(pq, 0);
+    }
+
+    return maxNode;
+    // pthread_mutex_unlock(&qlock);
 }
 
 // Example usage
