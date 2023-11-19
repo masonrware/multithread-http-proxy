@@ -216,6 +216,9 @@ void* listen_forever(void* listener_args){
                 // close the connection to the client
                 shutdown(payload_fd, SHUT_WR);
                 close(payload_fd);
+
+                shutdown(args->client_fd, SHUT_WR);
+                close(args->client_fd);
             }
             else {
                 printf("PQ EMPTY\n");
