@@ -195,7 +195,7 @@ void* listen_forever(void* listener_args){
         // request is a GET_JOB request
         if(strcmp(request->path, GETJOBCMD)==0) {
             printf("GETJOB\n");
-            if (pq.size > 0){
+            if (count > 0){
                 printf("PQ NOT EMPTY\n");
                 int payload_fd;
                 pthread_mutex_lock(&mutex);
