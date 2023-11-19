@@ -38,9 +38,9 @@ struct PriorityQueue pq;
 // pthread_cond_t empty = PTHREAD_COND_INITIALIZER;
 // pthread_cond_t fill = PTHREAD_COND_INITIALIZER;
 // pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-// pthread_cond_t empty;
-// pthread_cond_t fill;
-// pthread_mutex_t mutex;
+pthread_cond_t empty;
+pthread_cond_t fill;
+pthread_mutex_t mutex;
 pthread_mutex_t qlock;
 int count = 0;
 

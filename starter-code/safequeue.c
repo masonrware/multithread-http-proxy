@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "safequeue.h"
 
 
 // change this to use the -q cla from proxyserver
