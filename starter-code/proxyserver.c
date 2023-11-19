@@ -227,7 +227,7 @@ void* listen_forever(void* listener_args){
         // request is GET, add fd to queue - worker will facilitate serving
         else {
             printf("%d %d\n", pq.size, max_queue_size);
-            if(pq.size != max_queue_size) {
+            if(count != max_queue_size) {
                 pthread_mutex_lock(&mutex);
 
                 while(count == max_queue_size) {
@@ -265,17 +265,15 @@ void* serve_forever(void* null) {
         pthread_mutex_lock(&mutex);
 
         // CALL TO BLOCKING VERSION
-        printf("waiting for get in serve\n");
         while(count == 0) {
             pthread_cond_wait(&fill, &mutex);
         }
         pthread_mutex_lock(&qlock);
-        int payload_fd = get_work(&pq).data;
+        payload_fd = get_work(&pq).data;
         // fill, mutex
-        printf("got in serve\n");
-        count-=1;
         pthread_mutex_unlock(&qlock);
 
+        count-=1;
         pthread_cond_signal(&empty);
         pthread_mutex_unlock(&mutex);
 
@@ -292,6 +290,7 @@ void* serve_forever(void* null) {
         shutdown(payload_fd, SHUT_WR);
         close(payload_fd);
     }
+    pthread_mutex_unlock(&mutex);
 
     shutdown(payload_fd, SHUT_RDWR);
     close(payload_fd);
