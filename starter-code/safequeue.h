@@ -19,6 +19,10 @@ struct PriorityQueue {
     int max_size;
 };
 
+pthread_cond_t empty;
+pthread_cond_t fill;
+pthread_mutex_t mutex;
+
 // Function prototypes
 void create_queue(struct PriorityQueue *pq, int msize, int size);
 void swap(struct HeapNode *a, struct HeapNode *b);

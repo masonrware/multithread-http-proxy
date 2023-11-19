@@ -38,9 +38,9 @@ struct PriorityQueue pq;
 // pthread_cond_t empty = PTHREAD_COND_INITIALIZER;
 // pthread_cond_t fill = PTHREAD_COND_INITIALIZER;
 // pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t empty;
-pthread_cond_t fill;
-pthread_mutex_t mutex;
+// pthread_cond_t empty;
+// pthread_cond_t fill;
+// pthread_mutex_t mutex;
 pthread_mutex_t qlock;
 int count = 0;
 
@@ -239,7 +239,6 @@ void* listen_forever(void* listener_args){
             }
             pthread_mutex_lock(&qlock);
             
-            // TODO: maybe replace the below with similar count comparison as above for empty...
             if(add_work(&pq, args->client_fd, request->priority) < 0) {
                 send_error_response(args->client_fd, QUEUE_FULL, "Queue Full");
                 pthread_mutex_unlock(&qlock);
@@ -277,7 +276,6 @@ void* serve_forever(void* null) {
             pthread_cond_wait(&fill, &mutex);
         }
         pthread_mutex_lock(&qlock);
-        // TODO check for empty here??
         payload_fd = get_work(&pq).data;
         pthread_mutex_unlock(&qlock);
 
