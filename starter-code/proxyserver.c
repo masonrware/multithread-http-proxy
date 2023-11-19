@@ -195,12 +195,19 @@ void* listen_forever(void* listener_args){
         // request is a GET_JOB request
         if(strcmp(request->path, GETJOBCMD)==0) {
             printf("GETJOB\n");
-            if (count > 0){
+            // if (count > 0){
                 printf("PQ NOT EMPTY\n");
+                struct HeapNode payload;
                 int payload_fd;
                 pthread_mutex_lock(&mutex);
-                payload_fd = get_work(&pq).data;
-                count-=1;
+                payload = get_work(&pq);
+                // payload_fd = get_work(&pq).data;
+                if (payload.status_code = 1) {
+                    send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
+                } else {
+                    payload_fd = payload.data;
+                    count-=1;
+                }
                 pthread_mutex_unlock(&mutex);
 
                 struct parsed_request *qpop = malloc(sizeof(struct parsed_request));
@@ -219,13 +226,13 @@ void* listen_forever(void* listener_args){
 
                 shutdown(args->client_fd, SHUT_WR);
                 close(args->client_fd);
-            }
-            else {
-                printf("PQ EMPTY\n");
-                send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
-                shutdown(args->client_fd, SHUT_WR);
-                close(args->client_fd);
-            }
+            // }
+            // else {
+            //     printf("PQ EMPTY\n");
+            //     send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
+            //     shutdown(args->client_fd, SHUT_WR);
+            //     close(args->client_fd);
+            // }
         } 
         // request is a GET request
         else {
@@ -241,8 +248,9 @@ void* listen_forever(void* listener_args){
             if(add_work(&pq, args->client_fd, request->priority) < 0) {
                 send_error_response(args->client_fd, QUEUE_FULL, "Queue Full");
                 pthread_mutex_unlock(&qlock);
+            } else {
+                pthread_mutex_unlock(&qlock);
             }
-            pthread_mutex_unlock(&qlock);
 
             count+=1;
             pthread_cond_signal(&fill);
@@ -263,6 +271,7 @@ void* listen_forever(void* listener_args){
 // take in void* args, convert to struct pointer for ThreadArgs
 void* serve_forever(void* null) {
     printf("Serve forever\n");
+    struct HeapNode payload;
     int payload_fd;
     while(1) {
         printf("SERVE LOCK\n");
@@ -274,7 +283,15 @@ void* serve_forever(void* null) {
             pthread_cond_wait(&fill, &mutex);
         }
         pthread_mutex_lock(&qlock);
-        payload_fd = get_work(&pq).data;
+        payload = get_work(&pq);
+        // payload_fd = get_work(&pq).data;
+        if (payload.status_code = 1) {
+            send_error_response(payload.data, QUEUE_EMPTY, "Queue Empty");
+        } else {
+            payload_fd = payload.data;
+            count-=1;
+        }
+        pthread_mutex_unlock(&mutex);
         pthread_mutex_unlock(&qlock);
 
         count-=1;
@@ -284,11 +301,11 @@ void* serve_forever(void* null) {
 
         serve_request(payload_fd);
 
-        struct parsed_request *payload = malloc(sizeof(struct parsed_request));
-        payload = parse_client_request(payload_fd);
+        struct parsed_request *parsed_payload = malloc(sizeof(struct parsed_request));
+        parsed_payload = parse_client_request(payload_fd);
 
-        if(payload->delay > 0) {
-            sleep(payload->delay);
+        if(parsed_payload->delay > 0) {
+            sleep(parsed_payload->delay);
         }
 
         // close the connection to the client

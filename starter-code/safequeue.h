@@ -9,6 +9,7 @@
 struct HeapNode {
     int data;
     int priority;
+    int status_code;
 };
 
 // Structure to represent the priority queue

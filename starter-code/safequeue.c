@@ -11,6 +11,7 @@
 struct HeapNode {
     int data;
     int priority;
+    int status_code;
 };
 
 // Structure to represent the priority queue
@@ -88,8 +89,9 @@ struct HeapNode get_work(struct PriorityQueue *pq) {
     // printf("GET LOCK\n");
     // pthread_mutex_lock(&qlock);
     if (pq->size == 0) {
-        printf("Priority Queue is empty.\n");
-        exit(1); 
+        struct HeapNode errNode;
+        errNode.status_code = 1;
+        return errNode;
     }
 
     struct HeapNode maxNode = pq->heap[0];
@@ -99,6 +101,8 @@ struct HeapNode get_work(struct PriorityQueue *pq) {
         pq->heap[0] = pq->heap[pq->size];
         maxHeapify(pq, 0);
     }
+
+    maxNode.status_code = 0;
 
     return maxNode;
     // pthread_mutex_unlock(&qlock);
@@ -109,8 +113,9 @@ struct HeapNode get_work(struct PriorityQueue *pq) {
 struct HeapNode get_work_nonblocking(struct PriorityQueue *pq) {
     // pthread_mutex_lock(&qlock);
     if (pq->size == 0) {
-        printf("Priority Queue is empty.\n");
-        exit(1); 
+        struct HeapNode errNode;
+        errNode.status_code = 1;
+        return errNode;
     }
 
     struct HeapNode maxNode = pq->heap[0];
@@ -120,6 +125,8 @@ struct HeapNode get_work_nonblocking(struct PriorityQueue *pq) {
         pq->heap[0] = pq->heap[pq->size];
         maxHeapify(pq, 0);
     }
+
+    maxNode.status_code = 0;
 
     return maxNode;
     // pthread_mutex_unlock(&qlock);
