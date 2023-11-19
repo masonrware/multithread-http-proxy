@@ -239,6 +239,7 @@ void* listen_forever(void* listener_args){
             }
             pthread_mutex_lock(&qlock);
             add_work(&pq, args->client_fd, request->priority);
+            count++;
             pthread_mutex_unlock(&qlock);
             count+=1;
             pthread_cond_signal(&fill);
