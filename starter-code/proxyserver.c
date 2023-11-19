@@ -195,7 +195,7 @@ void* listen_forever(void* listener_args){
         // request is a GET_JOB request
         if(strcmp(request->path, GETJOBCMD)==0) {
             printf("GETJOB\n");
-            if (count > 0){
+            if (pq.size > 0){
                 printf("PQ NOT EMPTY\n");
                 int payload_fd;
                 pthread_mutex_lock(&mutex);
@@ -238,7 +238,7 @@ void* listen_forever(void* listener_args){
                 pthread_cond_wait(&empty, &mutex);
             }
             pthread_mutex_lock(&qlock);
-
+            
             // TODO: maybe replace the below with similar count comparison as above for empty...
             if(add_work(&pq, args->client_fd, request->priority) < 0) {
                 send_error_response(args->client_fd, QUEUE_FULL, "Queue Full");
