@@ -220,6 +220,7 @@ void* listen_forever(void* listener_args){
             else {
                 printf("PQ EMPTY\n");
                 send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
+                return;
             }
         } 
         // request is a GET request
