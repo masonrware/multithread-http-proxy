@@ -195,7 +195,7 @@ void* listen_forever(void* listener_args){
         // request is a GET_JOB request
         if(strcmp(request->path, GETJOBCMD)==0) {
             printf("GETJOB\n");
-            // if (count > 0){
+            if (count > 0){
                 printf("PQ NOT EMPTY\n");
                 int payload_fd;
                 pthread_mutex_lock(&mutex);
@@ -219,13 +219,13 @@ void* listen_forever(void* listener_args){
 
                 shutdown(args->client_fd, SHUT_WR);
                 close(args->client_fd);
-            // }
-            // else {
-            //     printf("PQ EMPTY\n");
-            //     send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
-            //     shutdown(args->client_fd, SHUT_WR);
-            //     close(args->client_fd);
-            // }
+            }
+            else {
+                printf("PQ EMPTY\n");
+                send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
+                shutdown(args->client_fd, SHUT_WR);
+                close(args->client_fd);
+            }
         } 
         // request is a GET request
         else {
@@ -243,10 +243,10 @@ void* listen_forever(void* listener_args){
                 pthread_mutex_unlock(&qlock);
             } else {
                 pthread_mutex_unlock(&qlock);
+                count+=1;
+                pthread_cond_signal(&fill);
             }
 
-            count+=1;
-            pthread_cond_signal(&fill);
             pthread_mutex_unlock(&mutex);
             printf("LISTEN UNLOCK\n");
         }
@@ -275,6 +275,7 @@ void* serve_forever(void* null) {
             pthread_cond_wait(&fill, &mutex);
         }
         pthread_mutex_lock(&qlock);
+        // TODO check for empty here??
         payload_fd = get_work(&pq).data;
         pthread_mutex_unlock(&qlock);
 
