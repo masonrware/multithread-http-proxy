@@ -197,19 +197,10 @@ void* listen_forever(void* listener_args){
             printf("GETJOB\n");
             // if (count > 0){
                 printf("PQ NOT EMPTY\n");
-
-                struct HeapNode payload;
-                int payload_fd = 0;
-
+                int payload_fd;
                 pthread_mutex_lock(&mutex);
-                payload = get_work(&pq);
-                // payload_fd = get_work(&pq).data;
-                if (payload.status_code == 1) {
-                    send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
-                } else {
-                    payload_fd = payload.data;
-                    count-=1;
-                }
+                payload_fd = get_work(&pq).data;
+                count-=1;
                 pthread_mutex_unlock(&mutex);
 
                 struct parsed_request *qpop = malloc(sizeof(struct parsed_request));
@@ -273,10 +264,7 @@ void* listen_forever(void* listener_args){
 // take in void* args, convert to struct pointer for ThreadArgs
 void* serve_forever(void* null) {
     printf("Serve forever\n");
-
-    struct HeapNode payload;
-    int payload_fd = 0;
-    
+    int payload_fd;
     while(1) {
         printf("SERVE LOCK\n");
         pthread_mutex_lock(&mutex);
@@ -287,15 +275,7 @@ void* serve_forever(void* null) {
             pthread_cond_wait(&fill, &mutex);
         }
         pthread_mutex_lock(&qlock);
-        payload = get_work(&pq);
-        // payload_fd = get_work(&pq).data;
-        if (payload.status_code == 1) {
-            send_error_response(payload.data, QUEUE_EMPTY, "Queue Empty");
-        } else {
-            payload_fd = payload.data;
-            count-=1;
-        }
-        pthread_mutex_unlock(&mutex);
+        payload_fd = get_work(&pq).data;
         pthread_mutex_unlock(&qlock);
 
         count-=1;
@@ -305,11 +285,11 @@ void* serve_forever(void* null) {
 
         serve_request(payload_fd);
 
-        struct parsed_request *parsed_payload = malloc(sizeof(struct parsed_request));
-        parsed_payload = parse_client_request(payload_fd);
+        struct parsed_request *payload = malloc(sizeof(struct parsed_request));
+        payload = parse_client_request(payload_fd);
 
-        if(parsed_payload->delay > 0) {
-            sleep(parsed_payload->delay);
+        if(payload->delay > 0) {
+            sleep(payload->delay);
         }
 
         // close the connection to the client
