@@ -5,9 +5,6 @@
 
 // change this to use the -q cla from proxyserver
 #define MAX_SIZE 100
-// pthread_cond_t empty;
-// pthread_cond_t fill;
-// pthread_mutex_t mutex;
 
 // Structure to represent a node in the heap
 struct HeapNode {
@@ -30,19 +27,13 @@ void create_queue(struct PriorityQueue *pq, int msize, int size){
 
 // Function to swap two nodes in the heap
 void swap(struct HeapNode *a, struct HeapNode *b) {
-    // printf("SWAP LOCK\n");
-    // pthread_mutex_lock(&qlock);
     struct HeapNode temp = *a;
     *a = *b;
     *b = temp;
-    // pthread_mutex_unlock(&qlock);
-    // printf("SWAP UNLOCK\n");
 }
 
 // Function to heapify a subtree rooted with node i
 void maxHeapify(struct PriorityQueue *pq, int i) {
-    // printf("HEAPIFY LOCK\n");
-    // pthread_mutex_lock(&qlock);
     int largest = i;
     int left = 2 * i + 1;
     int right = 2 * i + 2;
@@ -57,8 +48,6 @@ void maxHeapify(struct PriorityQueue *pq, int i) {
         swap(&pq->heap[i], &pq->heap[largest]);
         maxHeapify(pq, largest);
     }
-    // pthread_mutex_unlock(&qlock);
-    // printf("HEAPIFY UNLOCK\n");
 }
 
 // Function to insert a new element with a given priority into the priority queue
@@ -77,14 +66,6 @@ void add_work(struct PriorityQueue *pq, int data, int priority) {
 
 // Function to extract the element with the maximum priority from the priority queue
 struct HeapNode get_work(struct PriorityQueue *pq) {
-    // pthread_cond_t fill, pthread_mutex_t mutex
-    
-    // pthread_mutex_lock(&mutex);
-    // while (pq->size == 0) {
-    //     pthread_cond_wait(&fill, &mutex);
-    // }
-    // pthread_mutex_unlock(&mutex);
-
     struct HeapNode maxNode = pq->heap[0];
     pq->size--;
 
