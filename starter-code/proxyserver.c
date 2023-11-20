@@ -204,16 +204,6 @@ void* listen_forever(void* listener_args){
 
                 struct parsed_request *payload = malloc(sizeof(struct parsed_request));
                 payload = parse_client_request(payload_fd);
-                // char *buffer = (char *)malloc(RESPONSE_BUFSIZE * sizeof(char));
-
-                // // forward the client-requested payload back to the client
-                // int bytes_read = recv(payload_fd, buffer, RESPONSE_BUFSIZE, MSG_PEEK);
-                // int ret = http_send_data(args->client_fd, buffer, bytes_read);
-                // if (ret < 0) {
-                //     printf("Failed to send request to the client\n");
-                //     send_error_response(args->client_fd, BAD_GATEWAY, "Bad Gateway");
-                // }
-
                 send_error_response(args->client_fd, OK, payload->path);
 
                 // close the connection to the client
@@ -223,7 +213,7 @@ void* listen_forever(void* listener_args){
                 shutdown(args->client_fd, SHUT_WR);
                 close(args->client_fd);
             } else {
-                // send_error_response(args->client_fd, QUEUE_EMPTY, "[GETJOB] Queue Empty");
+                send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
                 shutdown(args->client_fd, SHUT_WR);
                 close(args->client_fd);
             }
