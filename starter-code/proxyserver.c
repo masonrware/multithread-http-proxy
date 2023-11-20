@@ -271,14 +271,16 @@ void* serve_forever(void* null) {
         pthread_cond_signal(&empty);
         pthread_mutex_unlock(&mutex);
 
-        serve_request(payload_fd);
-
         struct parsed_request *payload = malloc(sizeof(struct parsed_request));
         payload = parse_client_request(payload_fd);
 
         if(payload->delay > 0) {
             sleep(payload->delay);
         }
+
+        serve_request(payload_fd);
+
+        
 
         // close the connection to the client
         shutdown(payload_fd, SHUT_WR);
