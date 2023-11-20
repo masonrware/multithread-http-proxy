@@ -193,7 +193,7 @@ void* listen_forever(void* listener_args){
         if(strcmp(request->path, GETJOBCMD)==0) {
             if(count != 0) {
                 pthread_mutex_lock(&mutex);
-                printf("LISTEN GETJOB ACQUIRED\n");
+                // printf("LISTEN GETJOB ACQUIRED\n");
 
                 pthread_mutex_lock(&qlock);
                 // CALL TO NON BLOCKING VERSION
@@ -202,15 +202,19 @@ void* listen_forever(void* listener_args){
                 pthread_mutex_unlock(&qlock);
                 pthread_mutex_unlock(&mutex);
 
-                char *buffer = (char *)malloc(RESPONSE_BUFSIZE * sizeof(char));
+                struct parsed_request *payload = malloc(sizeof(struct parsed_request));
+                payload = parse_client_request(payload_fd);
+                // char *buffer = (char *)malloc(RESPONSE_BUFSIZE * sizeof(char));
 
-                // forward the client-requested payload back to the client
-                int bytes_read = recv(payload_fd, buffer, RESPONSE_BUFSIZE, MSG_PEEK);
-                int ret = http_send_data(args->client_fd, buffer, bytes_read);
-                if (ret < 0) {
-                    printf("Failed to send request to the client\n");
-                    send_error_response(args->client_fd, BAD_GATEWAY, "Bad Gateway");
-                }
+                // // forward the client-requested payload back to the client
+                // int bytes_read = recv(payload_fd, buffer, RESPONSE_BUFSIZE, MSG_PEEK);
+                // int ret = http_send_data(args->client_fd, buffer, bytes_read);
+                // if (ret < 0) {
+                //     printf("Failed to send request to the client\n");
+                //     send_error_response(args->client_fd, BAD_GATEWAY, "Bad Gateway");
+                // }
+
+                send_error_response(args->client_fd, OK, payload->path);
 
                 // close the connection to the client
                 shutdown(payload_fd, SHUT_WR);
@@ -219,7 +223,7 @@ void* listen_forever(void* listener_args){
                 shutdown(args->client_fd, SHUT_WR);
                 close(args->client_fd);
             } else {
-                send_error_response(args->client_fd, QUEUE_EMPTY, "[GETJOB] Queue Empty");
+                // send_error_response(args->client_fd, QUEUE_EMPTY, "[GETJOB] Queue Empty");
                 shutdown(args->client_fd, SHUT_WR);
                 close(args->client_fd);
             }
