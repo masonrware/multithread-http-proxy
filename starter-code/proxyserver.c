@@ -86,12 +86,11 @@ void serve_request(int client_fd) {
     char *buffer = (char *)malloc(RESPONSE_BUFSIZE * sizeof(char));
 
     // forward the client request to the fileserver
-    int bytes_read = read(client_fd, buffer, RESPONSE_BUFSIZE);
+    int bytes_read = recv(client_fd, buffer, RESPONSE_BUFSIZE, MSG_PEEK);
     int ret = http_send_data(fileserver_fd, buffer, bytes_read);
     if (ret < 0) {
         printf("Failed to send request to the file server\n");
         send_error_response(client_fd, BAD_GATEWAY, "Bad Gateway");
-
     } else {
         // forward the fileserver response to the client
         int c = 0;
@@ -128,7 +127,6 @@ struct ListenerThreadArgs* listener_args_array;
 
 // take in void* args, convert to struct pointer for ThreadArgs
 void* listen_forever(void* listener_args){
-    printf("Listen forever\n");
     struct ListenerThreadArgs *args = (struct ListenerThreadArgs *) listener_args;
 
     // create a socket to listen
@@ -173,13 +171,11 @@ void* listen_forever(void* listener_args){
 
     struct sockaddr_in client_address;
     size_t client_address_length = sizeof(client_address);
-    int c = 0;
     while (1) {
-        if (c % 50 == 0) printf("listening...\n");
-        c++;
         args->client_fd = accept(args->proxy_fd,
                            (struct sockaddr *)&client_address,
-                           (socklen_t *)&client_address_length); // listener threads
+                           (socklen_t *)&client_address_length);
+
         if (args->client_fd < 0) {
             perror("Error accepting socket");
             continue;
@@ -189,27 +185,30 @@ void* listen_forever(void* listener_args){
                inet_ntoa(client_address.sin_addr),
                client_address.sin_port);
         
+        // parse the request
         struct parsed_request *request = malloc(sizeof(struct parsed_request));
         request = parse_client_request(args->client_fd);
 
-        // request is a GET_JOB request
+        // request is GetJob, need to deal with it here
         if(strcmp(request->path, GETJOBCMD)==0) {
-            printf("GETJOB\n");
-            if (count > 0){
-                printf("PQ NOT EMPTY\n");
-                int payload_fd;
+            if(pq.size > 0) {
                 pthread_mutex_lock(&mutex);
-                payload_fd = get_work(&pq).data;
+                printf("LISTEN GETJOB ACQUIRED\n");
+
+                pthread_mutex_lock(&qlock);
+                // CALL TO NON BLOCKING VERSION
+                int payload_fd = get_work_nonblocking(&pq).data;
                 count-=1;
+                pthread_mutex_unlock(&qlock);
                 pthread_mutex_unlock(&mutex);
 
-                struct parsed_request *qpop = malloc(sizeof(struct parsed_request));
-                qpop = parse_client_request(payload_fd);
+                char *buffer = (char *)malloc(RESPONSE_BUFSIZE * sizeof(char));
 
-                // don't know what 3rd arg should be
-                int ret = http_send_data(args->client_fd, qpop->path, 64);
+                // forward the client-requested payload back to the client
+                int bytes_read = recv(payload_fd, buffer, RESPONSE_BUFSIZE, MSG_PEEK);
+                int ret = http_send_data(args->client_fd, buffer, bytes_read);
                 if (ret < 0) {
-                    printf("Failed to send request to the file server\n");
+                    printf("Failed to send request to the client\n");
                     send_error_response(args->client_fd, BAD_GATEWAY, "Bad Gateway");
                 }
 
@@ -219,38 +218,34 @@ void* listen_forever(void* listener_args){
 
                 shutdown(args->client_fd, SHUT_WR);
                 close(args->client_fd);
-            }
-            else {
-                printf("PQ EMPTY\n");
-                send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
+            } else {
+                send_error_response(args->client_fd, QUEUE_EMPTY, "[GETJOB] Queue Empty");
                 shutdown(args->client_fd, SHUT_WR);
                 close(args->client_fd);
             }
         } 
-        // request is a GET request
+        // request is GET, add fd to queue - worker will facilitate serving
         else {
-            printf("LISTEN LOCK\n");
-            pthread_mutex_lock(&mutex);
-            int count = 0;
-            while(count == max_queue_size) {
-                // if (count % 50 == 0) printf("[listen] Wating...\n");
-                count+=1;
-                pthread_cond_wait(&empty, &mutex);
-            }
-            pthread_mutex_lock(&qlock);
+            printf("%d %d\n", pq.size, max_queue_size);
+            if(count != max_queue_size) {
+                pthread_mutex_lock(&mutex);
 
-            // TODO: maybe replace the below with similar count comparison as above for empty...
-            if(add_work(&pq, args->client_fd, request->priority) < 0) {
-                send_error_response(args->client_fd, QUEUE_FULL, "Queue Full");
+                while(count == max_queue_size) {
+                    pthread_cond_wait(&empty, &mutex);
+                }
+                
+                pthread_mutex_lock(&qlock);
+                add_work(&pq, args->client_fd, request->priority);
+                count+=1;
                 pthread_mutex_unlock(&qlock);
+
+                pthread_cond_signal(&fill);
+                pthread_mutex_unlock(&mutex);
             } else {
-                pthread_mutex_unlock(&qlock);
-                count+=1;
+                send_error_response(args->client_fd, QUEUE_FULL, "[GET] Queue Full");
+                shutdown(args->client_fd, SHUT_WR);
+                close(args->client_fd);
             }
-
-            pthread_cond_signal(&fill);
-            pthread_mutex_unlock(&mutex);
-            printf("LISTEN UNLOCK\n");
         }
     }
 
@@ -265,26 +260,22 @@ void* listen_forever(void* listener_args){
 
 // take in void* args, convert to struct pointer for ThreadArgs
 void* serve_forever(void* null) {
-    printf("Serve forever\n");
     int payload_fd;
     while(1) {
-        printf("SERVE LOCK\n");
         pthread_mutex_lock(&mutex);
-        int count = 0;
+
+        // CALL TO BLOCKING VERSION
         while(count == 0) {
-            // if (count % 50 == 0) printf("[serve] Waiting...\n");
-            count+=1;
             pthread_cond_wait(&fill, &mutex);
         }
         pthread_mutex_lock(&qlock);
-        // TODO check for empty here??
         payload_fd = get_work(&pq).data;
+        // fill, mutex
         pthread_mutex_unlock(&qlock);
 
         count-=1;
         pthread_cond_signal(&empty);
         pthread_mutex_unlock(&mutex);
-        printf("SERVE UNLOCK 1\n");
 
         serve_request(payload_fd);
 
@@ -300,7 +291,6 @@ void* serve_forever(void* null) {
         close(payload_fd);
     }
     pthread_mutex_unlock(&mutex);
-    printf("SERVE UNLOCK 2\n");
 
     shutdown(payload_fd, SHUT_RDWR);
     close(payload_fd);
