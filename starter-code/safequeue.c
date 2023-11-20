@@ -113,18 +113,3 @@ struct HeapNode get_work_nonblocking(struct PriorityQueue *pq) {
 
     return maxNode;
 }
-
-// Example usage
-// int main() {
-//     struct PriorityQueue pq;
-//     pq.size = 0;
-
-//     add_work(&pq, 3, 2);
-//     add_work(&pq, 5, 1);
-//     add_work(&pq, 8, 3);
-
-//     struct HeapNode maxNode = get_work(&pq);
-//     printf("Extracted element: %d with priority %d\n", maxNode.data, maxNode.priority);
-
-//     return 0;
-// }

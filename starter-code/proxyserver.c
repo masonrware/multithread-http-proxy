@@ -191,7 +191,7 @@ void* listen_forever(void* listener_args){
 
         // request is GetJob, need to deal with it here
         if(strcmp(request->path, GETJOBCMD)==0) {
-            if(pq.size > 0) {
+            if(count != 0) {
                 pthread_mutex_lock(&mutex);
                 printf("LISTEN GETJOB ACQUIRED\n");
 
