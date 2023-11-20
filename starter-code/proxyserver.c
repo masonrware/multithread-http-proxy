@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 #include "proxyserver.h"
+#include "safequeue.h"
 
 
 /*
@@ -33,6 +34,12 @@ int num_workers;
 char *fileserver_ipaddr;
 int fileserver_port;
 int max_queue_size;
+struct PriorityQueue pq;
+pthread_cond_t empty;
+pthread_cond_t fill;
+pthread_mutex_t mutex;
+pthread_mutex_t qlock;
+int count = 0;
 
 void send_error_response(int client_fd, status_code_t err_code, char *err_msg) {
     http_start_response(client_fd, err_code);
@@ -49,7 +56,6 @@ void send_error_response(int client_fd, status_code_t err_code, char *err_msg) {
  * forward the fileserver response to the client
  */
 void serve_request(int client_fd) {
-
     // create a fileserver socket
     int fileserver_fd = socket(PF_INET, SOCK_STREAM, 0);
     if (fileserver_fd == -1) {
@@ -77,15 +83,17 @@ void serve_request(int client_fd) {
     char *buffer = (char *)malloc(RESPONSE_BUFSIZE * sizeof(char));
 
     // forward the client request to the fileserver
-    int bytes_read = read(client_fd, buffer, RESPONSE_BUFSIZE);
+    int bytes_read = recv(client_fd, buffer, RESPONSE_BUFSIZE, MSG_PEEK);
     int ret = http_send_data(fileserver_fd, buffer, bytes_read);
     if (ret < 0) {
         printf("Failed to send request to the file server\n");
         send_error_response(client_fd, BAD_GATEWAY, "Bad Gateway");
-
     } else {
         // forward the fileserver response to the client
+        int c = 0;
         while (1) {
+            if (c % 50 == 0) printf("serve request...\n");
+            c++;
             int bytes_read = recv(fileserver_fd, buffer, RESPONSE_BUFSIZE - 1, 0);
             if (bytes_read <= 0) // fileserver_fd has been closed, break
                 break;
@@ -104,22 +112,6 @@ void serve_request(int client_fd) {
     free(buffer);
 }
 
-
-/*
-    Create an array of pthread_t type with the length equal to numlisteners
-    For each thread in the array, instantiate the thread with Pthread_create
-        - What function do we pass each thread?
-            - listen() system call?
-        - Should we join these threads to the main thread, or have them function independently?
-
-    split serve_forever into listen_forever, serve_forever
-    each listener bound to a different port
-
-    worker threads and listener threads
-        - worker calls serve_forever
-        - listener calls listen_forever
-*/
-
 // pass args into a thread
 struct ListenerThreadArgs {
     int proxy_fd;
@@ -127,19 +119,12 @@ struct ListenerThreadArgs {
     int port;
 };
 
-struct WorkerThreadArgs {
-    int server_fd;
-    int port;
-};
-
 // array to access thread arguments globally, corresponds to num_listener
 struct ListenerThreadArgs* listener_args_array;
-// array to access thread arguments globally, corresponds to num_workers
-struct WorkerThreadArgs* worker_args_array;
 
-
-// TODO
-// take in void* args, convert to struct pointer for ThreadArgs
+/// @brief function that each listener thread runs
+/// @param listener_args argument struct passed to thread -- consists of file descriptors for client and proxy and port number
+/// @return void pointer
 void* listen_forever(void* listener_args){
     struct ListenerThreadArgs *args = (struct ListenerThreadArgs *) listener_args;
 
@@ -188,7 +173,7 @@ void* listen_forever(void* listener_args){
     while (1) {
         args->client_fd = accept(args->proxy_fd,
                            (struct sockaddr *)&client_address,
-                           (socklen_t *)&client_address_length); // listener threads
+                           (socklen_t *)&client_address_length);
         if (args->client_fd < 0) {
             perror("Error accepting socket");
             continue;
@@ -198,50 +183,113 @@ void* listen_forever(void* listener_args){
                inet_ntoa(client_address.sin_addr),
                client_address.sin_port);
         
-        // TODO replace below with write to priority queue with locking etc...
-        serve_request(args->client_fd); // worker threads
+        // parse the client's request
+        struct parsed_request *request = malloc(sizeof(struct parsed_request));
+        request = parse_client_request(args->client_fd);
 
-        // close the connection to the client
-        shutdown(args->client_fd, SHUT_WR);
-        close(args->client_fd);
+        // request is GetJob, need to deal with it solely in listener
+        if(strcmp(request->path, GETJOBCMD)==0) {
+            if(count != 0) {
+                pthread_mutex_lock(&mutex);
+                pthread_mutex_lock(&qlock);
+                // Call to non-blocking get work from queue
+                int payload_fd = get_work_nonblocking(&pq).data;
+                count-=1;
+                pthread_mutex_unlock(&qlock);
+                pthread_mutex_unlock(&mutex);
+
+                // parse the returned job
+                struct parsed_request *payload = malloc(sizeof(struct parsed_request));
+                payload = parse_client_request(payload_fd);
+                // use parsed job to send its path with a 200 Status Code
+                send_error_response(args->client_fd, OK, payload->path);
+
+                // close the connection to the client
+                shutdown(payload_fd, SHUT_WR);
+                close(payload_fd);
+
+                shutdown(args->client_fd, SHUT_WR);
+                close(args->client_fd);
+            } else {
+                // if the queue is currently empty, we throw an error
+                send_error_response(args->client_fd, QUEUE_EMPTY, "Queue Empty");
+                shutdown(args->client_fd, SHUT_WR);
+                close(args->client_fd);
+            }
+        } 
+        // request is GET, add fd to queue - worker will facilitate the serving
+        else {
+            if(count != max_queue_size) {
+                pthread_mutex_lock(&mutex);
+
+                // this will likely never hit, but is a concurrence check 
+                // to make sure we are not exceeding queue limit
+                while(count == max_queue_size) {
+                    pthread_cond_wait(&empty, &mutex);
+                }
+                
+                pthread_mutex_lock(&qlock);
+                // add job to the queue for worker to consume
+                add_work(&pq, args->client_fd, request->priority);
+                count+=1;
+                pthread_mutex_unlock(&qlock);
+
+                pthread_cond_signal(&fill);
+                pthread_mutex_unlock(&mutex);
+            } else {
+                // if the queue is currently full, return a queue full error to the client
+                send_error_response(args->client_fd, QUEUE_FULL, "[GET] Queue Full");
+                shutdown(args->client_fd, SHUT_WR);
+                close(args->client_fd);
+            }
+        }
     }
 
-    shutdown(args->proxy_fd, SHUT_RDWR);
-    close(args->proxy_fd);
+    return NULL;
 }
 
-/*
- * opens a TCP stream socket on all interfaces with port number PORTNO. Saves
- * the fd number of the server socket in *socket_number. For each accepted
- * connection, calls request_handler with the accepted fd number.
- */
+/// @brief function that each worker thread runs
+/// @param null 
+/// @return void pointer
+void* serve_forever(void* null) {
+    int payload_fd;
+    while(1) {
+        pthread_mutex_lock(&mutex);
 
-// take in void* args, convert to struct pointer for ThreadArgs
-void* serve_forever(void* worker_args) {
-    struct WorkerThreadArgs *args = (struct WorkerThreadArgs *) worker_args;
+        // This is the blocking mechanism, when the queue is empty, we wait using
+        // the fill variable so that we can consume something
+        while(count == 0) {
+            pthread_cond_wait(&fill, &mutex);
+        }
+        pthread_mutex_lock(&qlock);
+        // call to actual blocking version of get work
+        payload_fd = get_work(&pq).data;
+        pthread_mutex_unlock(&qlock);
+        count-=1;
+        pthread_cond_signal(&empty);
+        pthread_mutex_unlock(&mutex);
 
-    // create a socket to listen
-    args->server_fd = socket(PF_INET, SOCK_STREAM, 0);
-    if (args->server_fd == -1) {
-        perror("Failed to create a new socket");
-        exit(errno);
+        // parse the retrieved job for the delay info
+        struct parsed_request *payload = malloc(sizeof(struct parsed_request));
+        payload = parse_client_request(payload_fd);
+
+        // delay the serve if greater than zero using sleep
+        if(payload->delay > 0) {
+            sleep(payload->delay);
+        }
+
+        // serve the request to the client
+        serve_request(payload_fd);
+
+        // close the connection to the client
+        shutdown(payload_fd, SHUT_WR);
+        close(payload_fd);
     }
+    pthread_mutex_unlock(&mutex);
 
-    // manipulate options for the socket
-    int socket_option = 1;
-    if (setsockopt(args->server_fd, SOL_SOCKET, SO_REUSEADDR, &socket_option,
-                   sizeof(socket_option)) == -1) {
-        perror("Failed to set socket options");
-        exit(errno);
-    }
-
-    // TODO bind socket above to target ip address and port
-    // char *fileserver_ipaddr;  int fileserver_port;
-
-
-    // TODO consume priority queue contents with locking etc...
-    serve_request(args->server_fd); // worker threads
-    return NULL;
+    shutdown(payload_fd, SHUT_RDWR);
+    close(payload_fd);
+    return null;
 }
 
 /*
@@ -274,20 +322,10 @@ void print_settings() {
 
 void signal_callback_handler(int signum) {
     printf("Caught signal %d: %s\n", signum, strsignal(signum));
-    // close listener server fds
+    // close listener proxy fds and client fds
     for (int i = 0; i < num_listener; i++) {
-        // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
-
-        // modified to close each server file descriptor
         if (close(listener_args_array[i].proxy_fd) < 0) perror("Failed to close proxy_fd (ignoring)\n");
         if (close(listener_args_array[i].client_fd) < 0) perror("Failed to close client_fd (ignoring)\n");
-    }
-    // close worker client fds
-    for (int i = 0; i < num_workers; i++) {
-        // if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
-
-        // modified to close each client file descriptor
-        if (close(worker_args_array[i].server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
     }
     free(listener_ports);
     exit(0);
@@ -302,10 +340,16 @@ void exit_with_usage() {
 }
 
 int main(int argc, char **argv) {
+    printf("Main\n");
     signal(SIGINT, signal_callback_handler);
 
     /* Default settings */
     default_settings();
+
+    pthread_mutex_init(&mutex, NULL);
+    pthread_mutex_init(&qlock, NULL);
+    pthread_cond_init(&empty, NULL);
+    pthread_cond_init(&fill, NULL);
 
     int i;
     for (i = 1; i < argc; i++) {
@@ -321,6 +365,7 @@ int main(int argc, char **argv) {
             num_workers = atoi(argv[++i]);
         } else if (strcmp("-q", argv[i]) == 0) {
             max_queue_size = atoi(argv[++i]);
+            create_queue(&pq, max_queue_size, 0);
         } else if (strcmp("-i", argv[i]) == 0) {
             fileserver_ipaddr = argv[++i];
         } else if (strcmp("-p", argv[i]) == 0) {
@@ -331,12 +376,12 @@ int main(int argc, char **argv) {
         }
     }
     print_settings();
+    printf("Parsed\n");
 
     // make space for lists of Thread Arguments
-    // REMEMBER TO FREE THESE EVENTUALLY
     listener_args_array = (struct ListenerThreadArgs*) malloc(sizeof(struct ListenerThreadArgs) * num_listener);
-    worker_args_array = (struct WorkerThreadArgs*) malloc(sizeof(struct WorkerThreadArgs) * num_workers);
 
+    printf("Creating listener threads\n");
     // create listener threads for num_listener
     pthread_t listeners[num_listener];
     for (int i = 0; i < num_listener; i++){
@@ -345,29 +390,35 @@ int main(int argc, char **argv) {
         args.port = listener_ports[i];
         listener_args_array[i] = args; // place struct in listeners array
 
-        if (pthread_create(&listeners[i], NULL, listen_forever, (void*) &listener_args_array[i]) != 0){
+        if (pthread_create(&listeners[i], NULL, (void *) listen_forever, (void*) &listener_args_array[i]) != 0){
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
-
-        pthread_join(listeners[i], NULL);
     }
+    printf("Created %d listeners\n", num_listener);
 
     // create worker threads for num_workers
     pthread_t workers[num_workers];
     for (int i = 0; i < num_workers; i++){
-        struct WorkerThreadArgs args;
-        args.port = fileserver_port;
-        worker_args_array[i] = args;
-
         // pass in a struct so each worker can create its own socket
-        if (pthread_create(&workers[i], NULL, serve_forever, (void*) &worker_args_array[i]) != 0){
+        if (pthread_create(&workers[i], NULL, (void *) serve_forever, NULL) != 0){
             fprintf(stderr, "Failed to create thread\n");
             return 1;
         }
+    }
+    printf("Created %d workers\n", num_workers);
 
+    // join on listeners
+    for (int i = 0; i < num_listener; i++) {
+        pthread_join(listeners[i], NULL);
+    }
+    printf("Joined all listeners\n");
+
+    // join on workers
+    for (int i = 0; i < num_workers; i++) {
         pthread_join(workers[i], NULL);
     }
+    printf("Joined all workers, returning from main\n");
 
     return EXIT_SUCCESS;
 }
