@@ -126,7 +126,6 @@ struct ListenerThreadArgs* listener_args_array;
 /// @param listener_args argument struct passed to thread -- consists of file descriptors for client and proxy and port number
 /// @return void pointer
 void* listen_forever(void* listener_args){
-    // take in void* args, convert to struct pointer for ThreadArgs
     struct ListenerThreadArgs *args = (struct ListenerThreadArgs *) listener_args;
 
     // create a socket to listen
@@ -175,7 +174,6 @@ void* listen_forever(void* listener_args){
         args->client_fd = accept(args->proxy_fd,
                            (struct sockaddr *)&client_address,
                            (socklen_t *)&client_address_length);
-
         if (args->client_fd < 0) {
             perror("Error accepting socket");
             continue;

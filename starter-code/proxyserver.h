@@ -182,12 +182,14 @@ char *http_get_response_message(int status_code) {
     }
 }
 
+
 struct parsed_request* parse_client_request(int fd) {
     struct parsed_request *request = (struct parsed_request *)malloc(sizeof(struct parsed_request));
     char *read_buffer = malloc(LIBHTTP_REQUEST_MAX_SIZE + 1);
     if (!read_buffer) http_fatal_error("Malloc failed");
 
     int bytes_read = recv(fd, read_buffer, LIBHTTP_REQUEST_MAX_SIZE, MSG_PEEK);
+
     read_buffer[bytes_read] = '\0'; /* Always null-terminate. */
     printf("read buffer %s\n\n", read_buffer);
 
@@ -238,6 +240,7 @@ struct parsed_request* parse_client_request(int fd) {
     free(read_buffer);
 
     return request;
+
 }
 
 
